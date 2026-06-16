@@ -2,7 +2,7 @@ import { getTokenUserId } from "../lib/auth";
 
 "use client"
 
-import { BarChart2, ShoppingBag, Users, Zap, Calendar, ChevronRight, ChevronLeft, Clock, DollarSign, Filter, Plus, Search, BookOpen, CheckCircle, Award, TrendingUp, Book, MessageCircle,ShoppingCart, Play, X, Pause, RotateCcw, } from "lucide-react";
+import { BarChart2, ShoppingBag, Users, Zap, Calendar, ChevronRight, ChevronLeft, Clock, DollarSign, Filter, Plus, Search, BookOpen, CheckCircle, Award, TrendingUp, Book, MessageCircle,ShoppingCart, Play, X, Pause, RotateCcw, Compass, } from "lucide-react";
 import { motion } from "framer-motion";
 // import Sidebar from "../components/common/Sidebar";
 import Header from "../Components/common/Header";
@@ -24,45 +24,6 @@ const brandColors = {
   text: "#333333",
   white: "#FFFFFF",
 };
-
-const quickActions = [
-  {
-    label: 'Register for a Program',
-    color: 'bg-red-500',
-    icon: <Award size={40} className="text-white mb-4" />,
-    to: '/programs',
-  },
-  {
-    label: 'Take a Test',
-    color: 'bg-purple-900',
-    icon: <CheckCircle size={40} className="text-white mb-4" />,
-    to: '/assessment-management',
-  },
-  {
-    label: 'Learn Something',
-    color: 'bg-blue-800',
-    icon: <BookOpen size={40} className="text-white mb-4" />,
-    to: '/learning-management',
-  },
-  {
-    label: 'Join a Community',
-    color: 'bg-yellow-400',
-    icon: <Users size={40} className="text-white mb-4" />,
-    to: '/community',
-  },
-  {
-    label: 'Visit our Marketplace',
-    color: 'bg-teal-600',
-    icon: <ShoppingCart size={40} className="text-white mb-4" />,
-    to: '/marketplace',
-  },
-  {
-    label: 'View Your Results',
-    color: 'bg-pink-600',
-    icon:  <MessageCircle size={40} className="text-white mb-4" />,
-    to: '/view-results',
-  },
-];
 
 const ONBOARDING_ACCENT = "#003366";
 
@@ -166,6 +127,36 @@ const OnboardingWizard = ({ isVisible, onClose, onComplete, navigate }) => {
   );
 };
 
+// One column of the "What's Next" cross-track feed on the dashboard.
+const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, actionLabel, navigate }) => (
+  <div className="bg-white rounded-xl shadow-md p-5">
+    <h3 className="flex items-center gap-2 font-semibold text-[#003366] mb-4">
+      {icon}
+      {title}
+    </h3>
+    {items.length === 0 ? (
+      <p className="text-sm text-gray-400">{emptyLabel}</p>
+    ) : (
+      <div className="space-y-3">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => navigate(`/track/${item.trackSlug}`)}
+            className="w-full text-left rounded-lg border border-gray-100 p-3 hover:border-[#336699] hover:shadow-sm transition-all"
+          >
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.trackColor || "#336699" }} />
+              <span className="text-xs text-gray-400">{item.trackName}</span>
+            </div>
+            <p className="text-sm font-medium text-[#003366] line-clamp-1">{item.title || item.name}</p>
+            {renderMeta && <p className="text-xs text-gray-500 mt-0.5">{renderMeta(item)}</p>}
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+)
+
 const OverviewPage = () => {
   const { purposes, userExamination, loadExaminations, SetPurposeofRegistration, 
           setCompetitionList, setId, competitionList, setLoadExaminations,
@@ -177,19 +168,15 @@ const OverviewPage = () => {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredCard, setHoveredCard] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [sortOrder, setSortOrder] = useState("dateAsc");
   const [showAnalytics, setShowAnalytics] = useState(true);
-  const [activeTab, setActiveTab] = useState("programs");
   const [assessments,setAssessment]= useState([])
-  const [performanceData, setPreformanceData]= useState([])
-  const [subjectDistribution, setSubjectDistribution]=useState([])
   const [learningResources, setLearningResources] = useState([])
   const [registeredPrograms ,setRegisteredPrograms] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [myTracks, setMyTracks] = useState([])
   const [newCountsByTrack, setNewCountsByTrack] = useState({})
+  const [crossTrackFeed, setCrossTrackFeed] = useState({ newAssessments: [], upcomingCompetitions: [], upcomingCamps: [] })
+  const [trackStats, setTrackStats] = useState([])
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -206,78 +193,85 @@ const OverviewPage = () => {
     loadMyTracks()
   }, [])
 
-  // How many new (untaken, not-yet-seen) assessments sit in each of the user's tracks
+  // Builds the "What's Next" cross-track feed: new assessments and upcoming
+  // competitions/camps pulled from every track the user has picked, instead
+  // of three separate unfiltered tabs repeating the same global catalogs.
   useEffect(() => {
     if (myTracks.length === 0) return
-    const loadNewCounts = async () => {
+    const loadFeed = async () => {
       try {
         const profile = JSON.parse(localStorage.getItem('user') || '{}')
         const lastSeenAt = profile.last_seen_exams_at ? new Date(profile.last_seen_exams_at) : null
         const attemptedIds = new Set(assessments.map((q) => q.id || q.quizId))
+        const now = new Date()
 
         const results = await Promise.all(myTracks.map((t) => getTrackContent(t.id).catch(() => null)))
+
         const counts = {}
+        const newAssessments = []
+        const upcomingCompetitions = []
+        const upcomingCamps = []
+        const stats = []
+
         myTracks.forEach((t, i) => {
           const res = results[i]
           if (!res) return
-          counts[t.id] = res.exams.filter((e) =>
+
+          const newExams = res.exams.filter((e) =>
             !attemptedIds.has(e.id) && (!lastSeenAt || (e.created_at && new Date(e.created_at) > lastSeenAt))
-          ).length
+          )
+          counts[t.id] = newExams.length
+          newExams.forEach((e) => newAssessments.push({ ...e, trackName: t.name, trackSlug: t.slug, trackColor: t.color }))
+
+          res.competitions.forEach((c) => {
+            const d = c.start_date ? new Date(c.start_date) : null
+            if (d && !isNaN(d) && d >= now) {
+              upcomingCompetitions.push({ ...c, trackName: t.name, trackSlug: t.slug, trackColor: t.color, _date: d })
+            }
+          })
+
+          res.camps.forEach((c) => {
+            const d = c.start_date ? new Date(c.start_date) : null
+            if (d && !isNaN(d) && d >= now) {
+              upcomingCamps.push({ ...c, trackName: t.name, trackSlug: t.slug, trackColor: t.color, _date: d })
+            }
+          })
+
+          // Real per-track stats for the progress charts — replaces the old
+          // "Subject Performance" data source, which had no subject field at all
+          const trackExamIds = new Set(res.exams.map((e) => e.id))
+          const completedInTrack = assessments.filter((a) => trackExamIds.has(a.id) || trackExamIds.has(a.quizId))
+          const avgScore = completedInTrack.length
+            ? Math.round(completedInTrack.reduce((sum, a) => sum + (a.score || 0), 0) / completedInTrack.length)
+            : null
+          stats.push({
+            name: t.name,
+            color: t.color || "#336699",
+            competitions: res.competitions.length,
+            courses: res.courses.length,
+            exams: res.exams.length,
+            completedCount: completedInTrack.length,
+            avgScore,
+          })
         })
+
+        upcomingCompetitions.sort((a, b) => a._date - b._date)
+        upcomingCamps.sort((a, b) => a._date - b._date)
+
         setNewCountsByTrack(counts)
+        setTrackStats(stats)
+        setCrossTrackFeed({
+          newAssessments: newAssessments.slice(0, 5),
+          upcomingCompetitions: upcomingCompetitions.slice(0, 5),
+          upcomingCamps: upcomingCamps.slice(0, 5),
+        })
       } catch (error) {
-        console.error("Error loading new assessment counts:", error)
+        console.error("Error loading dashboard feed:", error)
       }
     }
-    loadNewCounts()
+    loadFeed()
   }, [myTracks, assessments])
 
-  // Mock analytics data - in production you would calculate this from real data
-  const analyticsData = {
-    totalPrograms: 0,
-    upcomingExams: 0,
-    completedExams: 0,
-    averageScore: 0
-  };
-
-  // Mock learning resources data
-  const learningResourcess = [
-    { id: 1, title: "Mathematics Fundamentals", category: "Mathematics", level: "Beginner", completed: false, progress: 0 },
-    { id: 2, title: "Physics: Core Concepts", category: "Science", level: "Intermediate", completed: false, progress: 65 },
-    { id: 3, title: "Essay Writing Guide", category: "English", level: "Advanced", completed: true, progress: 100 },
-    { id: 4, title: "Chemistry Laboratory Techniques", category: "Science", level: "Intermediate", completed: false, progress: 32 },
-    { id: 5, title: "Algebra Problem Solving", category: "Mathematics", level: "Intermediate", completed: false, progress: 78 },
-    { id: 6, title: "Reading Comprehension", category: "English", level: "Beginner", completed: true, progress: 100 },
-  ];
-
-  // Mock assessments data
-  const assessment = [
-    { id: 1, title: "Mathematics Quiz 1", totalQuestions: 20, score: 85, completed: true, date: "2025-03-28" },
-    { id: 2, title: "Physics Test", totalQuestions: 15, score: 92, completed: true, date: "2025-03-15" },
-    { id: 3, title: "English Language Assessment", totalQuestions: 30, score: 78, completed: true, date: "2025-02-20" },
-    { id: 4, title: "Weekly Math Challenge", totalQuestions: 10, completed: false, date: "2025-04-05" },
-    { id: 5, title: "Science Olympiad Prep", totalQuestions: 25, completed: false, date: "2025-04-10" },
-  ];
-
-  // Performance data for subjects chart
-  const performanceInformation= [
-    { subject: "Mathematics", score: 85 },
-    { subject: "Science", score: 92 },
-    { subject: "English", score: 78 },
-    { subject: "History", score: 88 }
-  ];
-
-  // Learning focus distribution data for pie chart
-  const subjectDistributions = [
-    { name: "Mathematics", value: 35 },
-    { name: "Science", value: 25 },
-    { name: "English", value: 20 },
-    { name: "History", value: 20 }
-  ];
-
-  // Colors for charts
-  const COLORS = ['#003366', '#336699', '#6699CC', '#99CCFF'];
-  
   // Show the guided tour once per account — until they complete or dismiss it
   useEffect(() => {
     const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
@@ -298,9 +292,6 @@ const OverviewPage = () => {
       const response = await getQuizDetails(jwtDecode(localStorage.getItem("token")).sub)
       if(response.success && response.quizDetails.length>0){
         setAssessment(()=>{return [...response.quizDetails]})
-        const performance = response.quizDetails
-        setPreformanceData(()=>{return [...performance]})
-
       }
 
     }
@@ -311,9 +302,6 @@ const OverviewPage = () => {
       const response = await getAllLearningResourceAnalytics(jwtDecode(localStorage.getItem("token")).sub)
       if(response.success && response.analytics.length>0){
         setLearningResources(()=>{return [...response.analytics]})
-        const learningAnalytics = response.analytics.map((item)=>{return {name:item.title, value:item.progress}})
-        setSubjectDistribution(()=>{return [...learningAnalytics]})
-
       }
 
     }
@@ -364,11 +352,6 @@ const OverviewPage = () => {
           
 
 
-            // const programs = response.data.user.purposeOfRegistration;
-            // localStorage.setItem("interests",JSON.stringify(programs))
-            analyticsData.totalPrograms = programs.length;
-            analyticsData.upcomingExams = programs.filter(p => new Date(p.startDate) > new Date()).length;
-            analyticsData.completedExams = programs.filter(p => new Date(p.endDate) < new Date()).length;
             console.log(getTokenUserId())
 
           }
@@ -405,106 +388,6 @@ const OverviewPage = () => {
 
   const handleViewResource = (id,courseId,title,category,level,progress) => {
     navigate(`/review-course`,{state:{courseId,title,category,level,progress}});
-  };
-
-  // Filter and sort functions
-  const extractGradeNumber = (value) => {
-    if (value === undefined || value === null) return null;
-    if (typeof value === "number") return value;
-    if (typeof value === "string") {
-      const match = value.match(/\d+/);
-      return match ? parseInt(match[0], 10) : null;
-    }
-    return null;
-  };
-
-  const getUserGradeNumber = () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return null;
-      const tokenGrade = jwtDecode(token).grade;
-      return extractGradeNumber(tokenGrade);
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const getFilteredPrograms = () => {
-    const listArray = JSON.parse(localStorage.getItem("interest")) || []
-    const objectsArray = competitions
-    let programs =  [];
-
-    if (!listArray.length) return programs;
-
-    listArray.forEach(item => {
-      competitions.forEach(obj => {
-        if (obj.type.includes(item)) {
-          const isDuplicate = programs.some(r =>
-            JSON.stringify(r) === JSON.stringify(obj.type)
-          );
-          if (!isDuplicate) {
-            programs.push(obj);
-          }
-        }
-      });
-    });
-
-    // console.log(programs)
-    const seen = new Set();
-    programs = programs.filter(obj => {
-      const key = `${obj.name}-${obj.year}`;
-      return seen.has(key) ? false : seen.add(key);
-    });
-
-    // Apply grade filter
-    const userGradeNumber = getUserGradeNumber();
-    const anyHasGradeArray = programs.some(p => Array.isArray(p.grade) && p.grade.length > 0);
-    if (anyHasGradeArray && userGradeNumber !== null) {
-      programs = programs.filter(p => {
-        // If no grade array on the item, always include it
-        if (!Array.isArray(p.grade) || p.grade.length === 0) return true;
-        const normalizedGrades = p.grade
-          .map(g => extractGradeNumber(g))
-          .filter(gNum => gNum !== null);
-        return normalizedGrades.includes(userGradeNumber);
-      });
-    }
-
-
-    
-    // Apply search filter
-    if (searchTerm) {
-      programs = programs.filter(program => 
-        program.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Apply status filter
-    if (filterStatus !== "all") {
-      programs = programs.filter(program => program.status === filterStatus);
-    }
-    
-    // Apply sorting
-    programs = programs.sort((a, b) => {
-      switch(sortOrder) {
-        case "dateAsc":
-          return new Date(a.startDate) - new Date(b.startDate);
-        case "dateDesc":
-          return new Date(b.startDate) - new Date(a.startDate);
-        case "costAsc":
-          return a.cost - b.cost;
-        case "costDesc":
-          return b.cost - a.cost;
-        case "nameAsc":
-          return a.name.localeCompare(b.name);
-        case "nameDesc":
-          return b.name.localeCompare(a.name);
-        default:
-          return 0;
-      }
-    });
-    
-    return programs;
   };
 
   // Format date for display
@@ -561,37 +444,63 @@ const OverviewPage = () => {
         {/* Continue Your Track */}
         <div className="mb-10">
           {myTracks.length > 0 ? (
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-lg font-semibold text-[#003366] mb-4">Continue Your Track</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myTracks.map((track) => {
+            <div>
+              <h2 className="text-xl font-semibold text-[#003366] mb-4">Continue Your Track</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myTracks.map((track, i) => {
                   const newCount = newCountsByTrack[track.id] || 0
+                  const stats = trackStats.find((s) => s.name === track.name)
+                  const color = track.color || ["#336699", "#1D9E75", "#E8A020", "#185FA5", "#9333EA"][i % 5]
                   return (
                     <button
                       key={track.id}
                       onClick={() => navigate(`/track/${track.slug}`)}
-                      className="text-left rounded-lg border border-gray-200 p-4 hover:shadow-md hover:border-[#336699] transition-all relative"
+                      className="group text-left rounded-2xl bg-white border overflow-hidden transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 relative"
+                      style={{ borderColor: "#E5E7EB" }}
                     >
-                      {newCount > 0 && (
-                        <span
-                          className="absolute -top-2 -right-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white"
-                          style={{ backgroundColor: track.color || "#336699" }}
-                        >
-                          {newCount} new
+                      <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
+                      <div className="p-5">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl" style={{ backgroundColor: `${color}1A` }}>
+                            {track.icon || <Compass size={20} style={{ color }} />}
+                          </div>
+                          {newCount > 0 && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
+                              {newCount} new
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-[#003366] mb-1">{track.name}</p>
+                        {stats ? (
+                          <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                            <span>{stats.competitions} competitions</span>
+                            <span>•</span>
+                            <span>{stats.exams} assessments</span>
+                          </div>
+                        ) : (
+                          <div className="h-4 mb-3" />
+                        )}
+                        {stats?.avgScore != null && (
+                          <div className="mb-3">
+                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${stats.avgScore}%`, backgroundColor: color }} />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">{stats.avgScore}% average score</p>
+                          </div>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-sm font-semibold" style={{ color }}>
+                          Open track <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                         </span>
-                      )}
-                      <p className="font-semibold text-[#003366]">{track.name}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {newCount > 0 ? `${newCount} new assessment${newCount > 1 ? "s" : ""} →` : "Open track →"}
-                      </p>
+                      </div>
                     </button>
                   )
                 })}
                 <button
                   onClick={() => navigate("/tracks")}
-                  className="text-left rounded-lg border border-dashed border-gray-300 p-4 hover:border-[#336699] transition-all text-gray-500"
+                  className="rounded-2xl border border-dashed border-gray-300 p-5 hover:border-[#336699] transition-all text-gray-400 flex flex-col items-center justify-center gap-1 min-h-[160px]"
                 >
-                  Manage tracks →
+                  <Plus className="h-5 w-5" />
+                  <span className="text-sm font-medium">Manage tracks</span>
                 </button>
               </div>
             </div>
@@ -611,384 +520,48 @@ const OverviewPage = () => {
           )}
         </div>
 
-        {/* Quick Actions Card Grid */}
-        <div className="mb-10 flex flex-col items-center justify-center">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 quick-actions-grid">
-            {quickActions.map((action) => (
+        {/* What's Next — cross-track feed, replaces the old Programs/Learning/Assessments tabs */}
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold text-[#003366] mb-4">What's Next</h2>
+          {myTracks.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-6 text-center">
+              <p className="text-gray-500 mb-4">Choose a track to see what's coming up across your subjects.</p>
               <button
-                key={action.label}
-                onClick={() => navigate(action.to)}
-                className={`rounded-2xl shadow-lg flex flex-col items-center justify-center w-64 h-56 ${action.color} hover:scale-105 transition-transform duration-200 focus:outline-none`}
-                style={{ minWidth: '220px', minHeight: '180px' }}
+                onClick={() => navigate("/tracks")}
+                className="px-5 py-2.5 rounded-lg bg-[#003366] text-white font-medium hover:bg-[#002347] transition-colors"
               >
-                {action.icon}
-                <span className="text-white text-xl font-bold text-center px-2">{action.label}</span>
+                Choose Tracks
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="mb-6 border-b border-gray-200 navigation-tabs">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab("programs")}
-              className={`py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "programs"
-                  ? "border-[#003366] text-[#003366]"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center">
-                <ShoppingBag className="mr-2 h-5 w-5" />
-                Programs & Competitions
-              </div>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("learning")}
-              className={`py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "learning"
-                  ? "border-[#003366] text-[#003366]"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center">
-                <BookOpen className="mr-2 h-5 w-5" />
-                Learning Resources
-              </div>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("assessments")}
-              className={`py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === "assessments"
-                  ? "border-[#003366] text-[#003366]"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center">
-                <CheckCircle className="mr-2 h-5 w-5" />
-                Assessments
-              </div>
-            </button>
-          </nav>
-        </div>
-        
-        {/* Filters and Search - Only show for Programs tab */}
-        {activeTab === "programs" && (
-          <motion.div 
-            className="mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 search-filters"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="relative w-full sm:w-64">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search programs"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-[#6699CC] focus:border-[#6699CC]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <FeedColumn
+                title="New Assessments"
+                icon={<CheckCircle className="h-5 w-5 text-[#336699]" />}
+                items={crossTrackFeed.newAssessments}
+                emptyLabel="No new assessments right now."
+                renderMeta={(item) => `${item.number_of_questions || item.totalQuestions || "?"} questions`}
+                navigate={navigate}
+              />
+              <FeedColumn
+                title="Upcoming Competitions"
+                icon={<ShoppingBag className="h-5 w-5 text-[#336699]" />}
+                items={crossTrackFeed.upcomingCompetitions}
+                emptyLabel="No upcoming competitions right now."
+                renderMeta={(item) => item.start_date}
+                navigate={navigate}
+              />
+              <FeedColumn
+                title="Upcoming Camps"
+                icon={<Calendar className="h-5 w-5 text-[#336699]" />}
+                items={crossTrackFeed.upcomingCamps}
+                emptyLabel="No upcoming camps right now."
+                renderMeta={(item) => item.is_virtual ? "Virtual" : (item.location || item.start_date)}
+                navigate={navigate}
               />
             </div>
-            
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              <select 
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-[#6699CC] focus:border-[#6699CC]"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              >
-                <option value="dateAsc">Date: Earliest First</option>
-                <option value="dateDesc">Date: Latest First</option>
-                <option value="costAsc">Cost: Low to High</option>
-                <option value="costDesc">Cost: High to Low</option>
-                <option value="nameAsc">Name: A-Z</option>
-                <option value="nameDesc">Name: Z-A</option>
-              </select>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Programs Content */}
-        {activeTab === "programs" && (
-          <>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6699CC]"></div>
-              </div>
-            ) : (
-              <>
-                {getFilteredPrograms().length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-                    <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No programs found</h3>
-                    <p className="text-gray-500 mb-6">
-                      {searchTerm || filterStatus !== "all" 
-                        ? "Try adjusting your filters or search terms" 
-                        : "You haven't enrolled in any programs yet"}
-                    </p>
-                    <button 
-                      onClick={handleViewAllPrograms}
-                      className="bg-[#003366] text-white px-6 py-3 rounded-lg hover:bg-[#002244] transition-colors"
-                    >
-                      Browse Available Programs
-                    </button>
-                  </div>
-                ) : (
-                  <motion.div
-                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-12 programs-grid"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ staggerChildren: 0.1 }}
-                  >
-                    {getFilteredPrograms().map((item, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                        whileHover={{ y: -5 }}
-                        onMouseEnter={() => setHoveredCard(index)}
-                        onMouseLeave={() => setHoveredCard(null)}
-                        className={`relative overflow-hidden rounded-xl shadow-lg transition-all duration-300 ${
-                          hoveredCard === index ? 'shadow-xl' : 'shadow-md'
-                        }`}
-                      >
-                        <div 
-                          className="absolute inset-0 bg-gradient-to-br from-[#003366] to-[#336699] opacity-90"
-                          style={{ 
-                            transform: hoveredCard === index ? 'scale(1.05)' : 'scale(1)',
-                            transition: 'transform 0.3s ease'
-                          }}
-                        />
-                        <div className="relative z-10 p-6 text-white">
-                          <div className="flex items-center justify-between mb-4">
-                            <ShoppingBag className="w-8 h-8" />
-                            <span className="text-sm font-medium bg-white/20 px-2 py-1 rounded-full">
-                            {/* {item.registered.includes(getTokenUserId())?"Registered":""} */}
-
-                            </span>
-                          </div>
-                          <h3 className="text-xl font-semibold mb-2">{item.name}</h3>
-                          
-                          <div className="space-y-2 mb-4">
-                            {/* Date Information */}
-                            <div className="flex items-center text-white/80 text-sm">
-                              <Clock className="w-4 h-4 mr-2" />
-                              <div>
-                                <span className="block">Start: {formatDate(item.startDate)}</span>
-                                <span className="block">End: {formatDate(item.EndDate)}</span>
-                              </div>
-                            </div>
-                            
-                            {/* Cost Information */}
-                            <div className="flex items-center text-white/80 text-sm">
-                              <div className="w-4 h-4 mr-2 flex items-center justify-center font-bold">₵</div>
-                              <span>{formatCost(item.cost)}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex justify-between items-center">
-                            <button
-                              onClick={() => handleCardClick(item._id, item)}
-                              className="px-4 py-2 bg-white text-[#003366] rounded-lg font-medium hover:bg-opacity-90 transition"
-                            >
-                              View Details
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
-                
-                {/* View All Programs Button */}
-                <div className="flex justify-center mt-8">
-                  <button 
-                    onClick={handleViewAllPrograms}
-                    className="flex items-center gap-2 bg-[#336699] hover:bg-[#003366] text-white px-6 py-3 rounded-lg transition-colors"
-                  >
-                    View All Available Programs
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </>
-            )}  
-          </>
-        )}
-
-        {/* Learning Resources Content */}
-        {activeTab === "learning" && (
-          <>
-            <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-2xl font-semibold text-[#003366]">Learning Resources</h2>
-              <div className="relative w-64">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search resources"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-[#6699CC] focus:border-[#6699CC]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {learningResources.map((resource, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow"
-                >
-                  <div className={`h-2 ${
-                    resource.category === "Mathematics" ? "bg-[#003366]" :
-                    resource.category === "Science" ? "bg-[#336699]" :
-                    resource.category === "English" ? "bg-[#6699CC]" : "bg-gray-400"
-                  }`}></div>
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center">
-                        <div className={`p-2 rounded-full ${
-                          resource.category === "Mathematics" ? "bg-[#003366]/10 text-[#003366]" :
-                          resource.category === "Science" ? "bg-[#336699]/10 text-[#336699]" :
-                          resource.category === "English" ? "bg-[#6699CC]/10 text-[#6699CC]" : "bg-gray-100 text-gray-600"
-                        }`}>
-                          <Book className="w-5 h-5" />
-                        </div>
-                        <span className="ml-2 text-sm font-medium text-gray-600">{resource.category}</span>
-                      </div>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        resource.level === "Beginner" ? "bg-green-100 text-green-700" :
-                        resource.level === "Intermediate" ? "bg-blue-100 text-blue-700" :
-                        "bg-purple-100 text-purple-700"
-                      }`}>
-                        {resource.level}
-                      </span>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold text-[#003366] mb-3">{resource.title}</h3>
-                    
-                    {/* Progress bar */}
-                    <div className="w-full h-2 bg-gray-100 rounded-full mb-3 overflow-hidden">
-                      <div 
-                        className={`h-full ${
-                          resource.completed ? "bg-green-500" : "bg-[#6699CC]"
-                        }`}
-                        style={{ width: `${resource.progress}%` }}
-                      ></div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-500">
-                        {resource.completed ? "Completed" : `${formatProgress(resource.progress)} complete`}
-                      </span>
-                      <button 
-                        onClick={() => handleViewResource(resource.id,resource.courseId,resource.title,resource.category,resource.level,resource.progress)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                          resource.completed 
-                            ? "bg-gray-100 text-gray-700" 
-                            : "bg-[#336699] text-white hover:bg-[#003366]"
-                        }`}
-                      >
-                        {resource.completed ? "Review" : "Continue"}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="text-center mt-8">
-              <button className="bg-[#336699] hover:bg-[#003366] text-white px-6 py-3 rounded-lg transition-colors">
-                Browse All Learning Resources
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Assessments Content */}
-        {activeTab === "assessments" && (
-          <>
-            <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-2xl font-semibold text-[#003366]">Assessments</h2>
-              <button 
-                onClick={() => handleStartAssessment()}
-                className="px-4 py-2 bg-[#003366] text-white rounded-lg hover:bg-[#002244] transition-colors flex items-center gap-2"
-              >
-                <CheckCircle className="w-5 h-5" />
-                Start New Quiz
-              </button>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="p-6">
-                <div className="grid grid-cols-1 gap-4">
-                  {assessments.length>0? assessments.map((assessment, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center">
-                          <div className={`p-2 rounded-full mr-3 ${
-                            assessment.completed ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                          }`}>
-                            <CheckCircle className="w-5 h-5" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-[#003366]">
-                            {assessment.title}
-                          </h3>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {formatDate(assessment.date)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-sm text-gray-500">
-                              <div>
-                                Score: <span className="font-semibold">{assessment.score}%</span> • 
-                                Questions: {assessment.totalQuestions}
-                              </div>
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            navigate(`/review-assessment`,{state:{quizId:assessment.quizId}}) 
-                            }}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200`}
-                        >
-                          View Results
-                        </button>
-                      </div>
-                    </motion.div>
-                  )):<>No Course Records</>}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center mt-8">
-              <button className="bg-[#336699] hover:bg-[#003366] text-white px-6 py-3 rounded-lg transition-colors mr-4" onClick={()=>{navigate("/assessment-management")}}>
-                View All Assessments
-              </button>
-              <button className="bg-[#336699] hover:bg-[#003366] text-white px-6 py-3 rounded-lg transition-colors" onClick={()=>{navigate("/featured-quizzes")}}>
-                View Featured Quizzes
-              </button>
-            </div>
-          </>
-        )}
-
+          )}
+        </div>
 
         {/* Analytics Section */}
         {showAnalytics && (
@@ -1049,12 +622,11 @@ const OverviewPage = () => {
                     <div>
                       <p className="text-gray-500 text-sm">Average Score</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {Math.round(
-                          assessments
-                            .filter(a => a.completed)
-                            .reduce((sum, a) => sum + a.score, 0) / 
-                          assessments.filter(a => a.completed).length
-                        )}%
+                        {(() => {
+                          const completed = assessments.filter(a => a.completed)
+                          if (!completed.length) return "—"
+                          return `${Math.round(completed.reduce((sum, a) => sum + (a.score || 0), 0) / completed.length)}%`
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -1071,13 +643,18 @@ const OverviewPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
+          {trackStats.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-md p-6 text-center text-gray-400 text-sm">
+              Pick a track to see your performance broken down by subject.
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Performance Bar Chart */}
+            {/* Average score per track */}
             <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
               <h3 className="text-xl font-semibold text-[#003366] mb-4">Subject Performance</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={performanceData} margin={{ top: 5, right: 5, bottom: 20, left: 0 }}>
+                  <BarChart data={trackStats.map(s => ({ subject: s.name, score: s.avgScore ?? 0 }))} margin={{ top: 5, right: 5, bottom: 20, left: 0 }}>
                     <XAxis dataKey="subject" />
                     <YAxis />
                     <Tooltip />
@@ -1087,33 +664,37 @@ const OverviewPage = () => {
               </div>
             </div>
 
-            {/* Subject Distribution Pie Chart */}
+            {/* Resource distribution across tracks */}
             <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
               <h3 className="text-xl font-semibold text-[#003366] mb-4">Learning Focus</h3>
-              <div className="h-64 flex justify-center items-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={subjectDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {subjectDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {trackStats.every(s => s.courses === 0) ? (
+                <div className="h-64 flex items-center justify-center text-gray-400 text-sm">No resources tagged into your tracks yet.</div>
+              ) : (
+                <div className="h-64 flex justify-center items-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={trackStats.filter(s => s.courses > 0).map(s => ({ name: s.name, value: s.courses }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {trackStats.filter(s => s.courses > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           </div>
+          )}
         </motion.div>
         
         

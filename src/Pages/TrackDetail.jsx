@@ -29,7 +29,7 @@ const formatDateRange = (start, end) => {
   return start || end
 }
 
-const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew }) => (
+const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel }) => (
   <div
     className="group rounded-2xl bg-white border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex flex-col"
     style={{ borderColor: brandColors.border }}
@@ -43,7 +43,12 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew }) => (
           </span>
         )}
       </div>
-      {meta && <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-4">{meta}</div>}
+      {meta && <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">{meta}</div>}
+      {priceLabel && (
+        <span className="self-start text-xs font-semibold px-2 py-0.5 rounded-full mb-3" style={{ backgroundColor: `${color}1A`, color }}>
+          {priceLabel}
+        </span>
+      )}
       <button
         onClick={onAction}
         className="mt-auto self-start px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
@@ -191,6 +196,7 @@ const TrackDetail = () => {
   const renderCard = (item) => {
     if (activeTab === "competitions") {
       const dateRange = formatDateRange(item.start_date, item.end_date)
+      const total = (item.material_cost || 0) + (item.assessment_cost || 0)
       return (
         <ContentCard
           key={item.id}
@@ -198,6 +204,7 @@ const TrackDetail = () => {
           color={color}
           actionLabel="View Details"
           onAction={() => handleCompetitionClick(item)}
+          priceLabel={total > 0 ? `GH₵${total}` : "Free"}
           meta={dateRange && <span>{dateRange}</span>}
         />
       )
@@ -211,6 +218,7 @@ const TrackDetail = () => {
           color={color}
           actionLabel="Register"
           onAction={() => handleCampRegister(item.id)}
+          priceLabel={item.cost > 0 ? `GH₵${item.cost}` : "Free"}
           meta={
             <>
               {dateRange && <span>{dateRange}</span>}
@@ -221,6 +229,7 @@ const TrackDetail = () => {
       )
     }
     if (activeTab === "courses") {
+      const costLabel = item.cost && !["0", "free"].includes(String(item.cost).toLowerCase()) ? item.cost : "Free"
       return (
         <ContentCard
           key={item.id}
@@ -228,6 +237,7 @@ const TrackDetail = () => {
           color={color}
           actionLabel="Open Resource"
           onAction={() => handleCourseClick(item)}
+          priceLabel={costLabel}
           meta={item.duration && <span className="flex items-center gap-1"><Clock size={12} /> {item.duration}</span>}
         />
       )

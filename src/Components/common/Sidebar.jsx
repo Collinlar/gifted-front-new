@@ -21,68 +21,36 @@ const brandColors = {
   gray: "#E5E7EB"
 }
 
-const SIDEBAR_ITEMS = [
+// Grouped into tiers: Tracks is the primary, recommended way to use the app.
+// "Browse Everything" is the escape hatch for unfiltered, all-subject views.
+// Account groups billing/scheduling utilities at the bottom.
+const SIDEBAR_GROUPS = [
   {
-    name: "Dashboard",
-    icon: Home,
-    href: "/overview",
-  },
-  {
-    name: "My Tracks",
-    icon: Compass,
-    href: "/tracks",
-  },
-  {
-    name: "Programs",
-    icon: FileText,
-    href: "/programs",
-  },
-   {
-    name: "Marketplace",
-    icon: FileText,
-    href: "/marketplace",
-  },
-  // {
-  //   name: "Community",
-  //   icon: Users,
-  //   href: "/community",
-  // },
-  {
-    name: "Learning Hub",
-    icon: BookOpen,
-    href: "/learning-management",
-    // subItems: [
-    //   { name: "Courses", href: "/learning-management/courses" },
-    //   { name: "Resources", href: "/learning-management/resources" },
-    //   { name: "Progress", href: "/learning-management/progress" },
-    // ],
+    label: null,
+    items: [
+      { name: "Dashboard", icon: Home, href: "/overview" },
+      { name: "My Tracks", icon: Compass, href: "/tracks" },
+    ],
   },
   {
-    name: "Assessments",
-    icon: Activity,
-    href: "/assessment-management",
+    label: "Browse Everything",
+    items: [
+      { name: "Programs", icon: FileText, href: "/programs" },
+      { name: "Learning Hub", icon: BookOpen, href: "/learning-management" },
+      { name: "Assessments", icon: Activity, href: "/assessment-management" },
+    ],
   },
   {
-    name:"Invoice",
-    icon: LayoutList,
-    href:"/invoice-page"
+    label: "Account",
+    items: [
+      { name: "Marketplace", icon: FileText, href: "/marketplace" },
+      { name: "Invoice", icon: LayoutList, href: "/invoice-page" },
+      { name: "Calendar", icon: Calendar, href: "/calendar-page" },
+    ],
   },
-  {
-    name:"Calendar",
-    icon: Calendar,
-    href:"/calendar-page"
-  },
-  // {
-  //   name: "AI Assistant",
-  //   icon: Cpu,
-  //   href: "/ai-agent",
-  // },
-  // {
-  //   name: "Diagnostics",
-  //   icon: HelpCircle,
-  //   href: "/diagnostics",
-  // },
 ]
+
+const SIDEBAR_ITEMS = SIDEBAR_GROUPS.flatMap((group) => group.items)
 
 // Mock user data - in a real app this would come from auth context or API
 
@@ -90,6 +58,24 @@ const SIDEBAR_ITEMS = [
 const Sidebar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [expandedItems, setExpandedItems] = useState({})
+  // Labeled groups (Browse Everything, Account) start collapsed — Tracks is the
+  // primary path. Remembered per-browser so it doesn't re-collapse every visit.
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sidebarCollapsedGroups') || 'null')
+      return saved || { 'Browse Everything': true, 'Account': true }
+    } catch {
+      return { 'Browse Everything': true, 'Account': true }
+    }
+  })
+
+  const toggleGroup = (label) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [label]: !prev[label] }
+      localStorage.setItem('sidebarCollapsedGroups', JSON.stringify(next))
+      return next
+    })
+  }
   const location = useLocation()
   const [isMobile, setIsMobile] = useState(false)
 
@@ -277,8 +263,25 @@ const Sidebar = () => {
 
           {/* Navigation Items */}
           <nav className="flex-1 overflow-y-auto py-4 px-2 custom-scrollbar">
-            <ul className="space-y-1">
-              {SIDEBAR_ITEMS.map((item) => (
+            {SIDEBAR_GROUPS.map((group, groupIndex) => {
+              const hasActiveItem = group.items.some((item) => isItemActive(item.href))
+              const isCollapsed = group.label && !!collapsedGroups[group.label] && !hasActiveItem
+              return (
+            <div key={group.label || `group-${groupIndex}`} className={groupIndex > 0 ? "mt-4 pt-4 border-t" : ""} style={groupIndex > 0 ? { borderColor: brandColors.secondary } : undefined}>
+              {group.label && isSidebarOpen && (
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="w-full flex items-center justify-between px-3 mb-1 py-1 rounded hover:bg-white hover:bg-opacity-5 transition-colors"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: brandColors.accentLight }}>
+                    {group.label}
+                  </span>
+                  <ChevronRight size={14} className={`transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} color={brandColors.accentLight} />
+                </button>
+              )}
+              {(!group.label || !isCollapsed || !isSidebarOpen) && (
+              <ul className="space-y-1">
+              {group.items.map((item) => (
                 <li key={item.href}>
                   <Link to={item.href}>
                     <motion.div
@@ -349,7 +352,11 @@ const Sidebar = () => {
                   </AnimatePresence>
                 </li>
               ))}
-            </ul>
+              </ul>
+              )}
+            </div>
+              )
+            })}
           </nav>
 
           {/* Sidebar Footer */}
