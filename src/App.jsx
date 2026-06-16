@@ -5,6 +5,8 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import Sidebar from "./Components/common/Sidebar";
 
 import OverviewPage from "./Pages/OverviewPage";
+import Tracks from "./Pages/Tracks";
+import TrackDetail from "./Pages/TrackDetail";
 import Community from "./Pages/Community";
 import LearningManagement from "./Pages/LearningManagement";
 import AssessmentManagement from "./Pages/AssessmentManagement";
@@ -125,18 +127,21 @@ function App() {
 
 	
 	return (
-		<div className='flex h-screen overflow-auto'>
+		<div className='flex h-screen overflow-hidden'>
 			{/* BG */}
 			{/* <div className='fixed inset-0 z-0'>
 				<div className='absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 opacity-80' />
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/user-details")&&<Sidebar className="overflow-y-hidden" />}
+			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/user-details" || location.pathname=="/tracks" || location.pathname.startsWith("/track/"))&&<Sidebar className="overflow-y-hidden" />}
+			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				<Route index element={<LandingPages/>}/>
 				
 				<Route path='/overview' element={<OverviewPage competitions={competitions} />} />
+				<Route path='/tracks' element={<Tracks />} />
+				<Route path='/track/:slug' element={<TrackDetail />} />
 				<Route path='/community' element={<Community />} />
 				<Route path='/learning-management' element={<LearningManagement />} />
 				<Route path='/assessment-management' element={<AssessmentManagement />} />
@@ -207,6 +212,7 @@ function App() {
 	
 {/* 				<Route element={<CoursePage/>} path="/course"/> */}
 			</Routes>
+			</div>
 		</div>
 	);
 }

@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import { supabaseAdmin } from "../lib/supabaseAdmin"
+import { syncUserTracksFromInterests } from "../lib/auth"
 
 const brandColors = {
   primary: "#003366",
@@ -221,6 +222,9 @@ export default function ClaimAccount() {
         .from("users")
         .update({ claimed: true, claimed_by: newAuthId })
         .eq("id", oldId)
+
+      // Carry the old interest selections over into the new track system
+      await syncUserTracksFromInterests(newAuthId, userData.purpose_of_registration)
 
       setStep(STEPS.DONE)
     } catch (err) {

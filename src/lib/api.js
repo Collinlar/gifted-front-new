@@ -527,7 +527,143 @@ export async function updatePayAfterInvoice(item, id) {
   return { success: true, invoice: data }
 }
 
+// ─── Camps ─────────────────────────────────────────────────────────────────────
+
+export async function getAllCamps() {
+  const { data, error } = await supabaseAdmin
+    .from('camps')
+    .select('*')
+    .eq('publish', true)
+    .order('start_date', { ascending: true })
+
+  if (error) throw error
+  return { success: true, camps: data }
+}
+
+export async function getCamp(id) {
+  const { data, error } = await supabaseAdmin
+    .from('camps')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return { success: true, camp: data }
+}
+
+export async function getRegisteredCamps(userId) {
+  const { data, error } = await supabaseAdmin
+    .from('camp_registrations')
+    .select('*, camps(*)')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return { success: true, registrations: data }
+}
+
+export async function registerForCamp(userId, campId) {
+  const { data, error } = await supabaseAdmin
+    .from('camp_registrations')
+    .insert({ user_id: userId, camp_id: campId })
+    .select()
+    .single()
+
+  if (error) throw error
+  return { success: true, registration: data }
+}
+
+// ─── Tracks ────────────────────────────────────────────────────────────────────
+
+export async function getAllTracks() {
+  const { data, error } = await supabaseAdmin
+    .from('tracks')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw error
+  return { success: true, tracks: data }
+}
+
+export async function getTrackBySlug(slug) {
+  const { data, error } = await supabaseAdmin
+    .from('tracks')
+    .select('*')
+    .eq('slug', slug)
+    .single()
+
+  if (error) throw error
+  return { success: true, track: data }
+}
+
+export async function getUserTracks(userId) {
+  const { data, error } = await supabaseAdmin
+    .from('user_tracks')
+    .select('*, tracks(*)')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return { success: true, tracks: (data || []).map(row => row.tracks) }
+}
+
+export async function setUserTracks(userId, trackIds) {
+  // Replace the user's track selections wholesale — simpler than diffing
+  await supabaseAdmin.from('user_tracks').delete().eq('user_id', userId)
+  if (!trackIds.length) return { success: true }
+
+  const rows = trackIds.map(trackId => ({ user_id: userId, track_id: trackId }))
+  const { error } = await supabaseAdmin.from('user_tracks').insert(rows)
+  if (error) throw error
+  return { success: true }
+}
+
+// Fetches every competition/course/exam/camp tagged into a track, fully hydrated.
+// Returns them grouped by item_type so the track hub page can render each section directly.
+export async function getTrackContent(trackId) {
+  const { data: items, error } = await supabaseAdmin
+    .from('track_items')
+    .select('*')
+    .eq('track_id', trackId)
+
+  if (error) throw error
+
+  const idsByType = (items || []).reduce((acc, item) => {
+    acc[item.item_type] = acc[item.item_type] || []
+    acc[item.item_type].push(item.item_id)
+    return acc
+  }, {})
+
+  const [competitions, courses, exams, camps] = await Promise.all([
+    idsByType.competition?.length
+      ? supabaseAdmin.from('competitions').select('*').in('id', idsByType.competition).then(r => r.data || [])
+      : Promise.resolve([]),
+    idsByType.course?.length
+      ? supabaseAdmin.from('courses').select('*').in('id', idsByType.course).then(r => r.data || [])
+      : Promise.resolve([]),
+    idsByType.exam?.length
+      ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).then(r => r.data || [])
+      : Promise.resolve([]),
+    idsByType.camp?.length
+      ? supabaseAdmin.from('camps').select('*').in('id', idsByType.camp).then(r => r.data || [])
+      : Promise.resolve([]),
+  ])
+
+  return { success: true, competitions, courses, exams, camps }
+}
+
 // ─── Enrollments ───────────────────────────────────────────────────────────────
+
+// Stamps "now" as the last time this user looked at an Assessments tab.
+// Call this AFTER computing which exams were new for the current view —
+// otherwise the user would never see the "New" tag they just earned.
+export async function markExamsSeen(userId) {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ last_seen_exams_at: new Date().toISOString() })
+    .eq('id', userId)
+  if (error) throw error
+  return { success: true }
+}
 
 export async function getEnrollments(userId) {
   const { data, error } = await supabaseAdmin

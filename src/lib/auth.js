@@ -1,6 +1,25 @@
 import { supabase } from './supabase'
 import { supabaseAdmin } from './supabaseAdmin'
 import { jwtDecode } from 'jwt-decode'
+import { getAllTracks, setUserTracks } from './api'
+
+// Interest checkboxes at signup use the `interests` table's name column
+// (e.g. "Mathematics", "ICT"). Tracks use the same vocabulary, so we
+// resolve by case-insensitive name match rather than requiring an exact
+// string match — interests/tracks are managed independently in admin.
+export async function syncUserTracksFromInterests(userId, interestNames) {
+  if (!interestNames?.length) return
+  try {
+    const { tracks } = await getAllTracks()
+    const normalized = interestNames.map((n) => n.trim().toLowerCase())
+    const matchedIds = tracks
+      .filter((t) => normalized.includes(t.name.trim().toLowerCase()))
+      .map((t) => t.id)
+    if (matchedIds.length) await setUserTracks(userId, matchedIds)
+  } catch (error) {
+    console.warn('Could not sync user_tracks from interests:', error)
+  }
+}
 
 // Supabase JWTs use `sub` for user ID, not `id`.
 // Use this everywhere instead of jwtDecode(token).id
@@ -74,6 +93,11 @@ export async function loginUser({ email, password, userName }) {
   } else {
     localStorage.removeItem('legacy_mongo_id')
   }
+
+  // Distinguish "Welcome back" (returning login) from "Hello" (right after signup) on the dashboard
+  const hasLoggedInBefore = localStorage.getItem('hasLoggedInBefore') === 'true'
+  localStorage.setItem('isReturningSession', hasLoggedInBefore ? 'true' : 'false')
+  localStorage.setItem('hasLoggedInBefore', 'true')
 
   localStorage.setItem('token', token)
   localStorage.setItem('login', 'true')
@@ -183,6 +207,8 @@ export async function registerUser(registerData) {
     return { success: false, message: `Account created but profile save failed: ${upsertError.message}. Please try again.` }
   }
 
+  await syncUserTracksFromInterests(authUser.id, purposes)
+
   // Sign in to get a live session/token
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email,
@@ -205,6 +231,10 @@ export async function registerUser(registerData) {
     educationalLevel:      educationalLevel ?? '',
     purposeOfRegistration: purposes,
   }
+
+  // First-ever dashboard view for this account — not a "returning" session
+  localStorage.setItem('isReturningSession', 'false')
+  localStorage.setItem('hasLoggedInBefore', 'true')
 
   localStorage.setItem('token', token)
   localStorage.setItem('login', 'true')
