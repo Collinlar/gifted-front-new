@@ -20,6 +20,7 @@ import {
   Info
 } from 'lucide-react';
 import { fetchContestLeaderboard, getUserContestAttempts } from '../lib/api';
+import { getTokenUserId } from '../lib/auth';
 
 // Brand colors matching your existing design
 const brandColors = {
@@ -88,8 +89,8 @@ export default function ContestOverview() {
   const locator = useLocation()
   
   const contest = {
-    ...locator.state.contest, 
-    questionCount:locator.state.contest.questions.length,
+    ...locator.state.contest,
+    questionCount: (locator.state.contest.questions || []).length,
     rules: [
     "Answer all questions to the best of your ability",
     "Each question has a time limit for bonus points",
@@ -112,30 +113,19 @@ export default function ContestOverview() {
     try {
       const response = await fetchContestLeaderboard(contestId);
       
-      // Get current user ID from localStorage
-      let currentUserId = null;
-      try {
-        const userData = JSON.parse(localStorage.getItem("user") || "{}");
-        currentUserId = userData?._id;
-        console.log("Current user ID:", currentUserId);
-      } catch (error) {
-        console.error("Error parsing user data from localStorage:", error);
-      }
+      const currentUserId = getTokenUserId();
       
-      // Transform API response to match our leaderboard structure
+      // exam_scores columns: id, mongo_id, quiz_id, grade, score, user_id, display_name (resolved via public.users)
       const transformedData = response.leaderboard.map((item, index) => ({
         rank: index + 1,
-        name: item.userName || "Anonymous",
+        name: item.display_name || 'Anonymous',
         score: parseInt(item.score) || 0,
-        time: formatTime(item.timeTaken),
-        userId: item.userId,
-        courseId: item.courseId,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        isCurrentUser: currentUserId && item.userId === currentUserId,
-        attemptsMade:item.attemptsMade,
-        achievement: item.achievement,
-        grade:item.grade.match(/\d+/)[0]
+        time: '—',
+        userId: item.user_id,
+        isCurrentUser: currentUserId && item.user_id === currentUserId,
+        attemptsMade: 1,
+        achievement: null,
+        grade: item.grade ? (String(item.grade).match(/\d+/) || [''])[0] : '',
       }));
       
       // Sort by score (descending) and then by time (ascending for same scores)
@@ -152,21 +142,16 @@ export default function ContestOverview() {
         rank: index + 1
       }));
 
-      const leaderBoardData = rankedData.map((item)=>{
-        return {
-          rank:item.rank,
-          name:item.userName,
-          score:item.score,
-          time:item.time,
-          attemptsMade:item.attemptsMade,
-          isCurrentUser: currentUserId && item.userId== currentUserId,
-          badge: item.achievement.title,
-          grade:item.grade
-
-
-
-        }
-      })
+      const leaderBoardData = rankedData.map((item) => ({
+        rank: item.rank,
+        name: item.name,
+        score: item.score,
+        time: item.time,
+        attemptsMade: item.attemptsMade,
+        isCurrentUser: item.isCurrentUser,
+        badge: item.achievement?.title,
+        grade: item.grade,
+      }))
       setLeaderboardData(leaderBoardData)
       
       // Find current user's rank and score
@@ -175,8 +160,9 @@ export default function ContestOverview() {
       if (currentUserEntry) {
         setUserRank(currentUserEntry.rank);
         setUserScore(currentUserEntry.score);
-        setUserAttempts(currentUserEntry.attemptsMade)
-        setIsAttemptsExhausted(userAttempts>=contest.attemptsAllowed)
+        const attemptsMade = currentUserEntry.attemptsMade || 0
+        setUserAttempts(attemptsMade)
+        setIsAttemptsExhausted(attemptsMade >= getAttemptsAllowed())
         console.log("User rank:", currentUserEntry.rank, "User score:", currentUserEntry.score);
       } else {
         setUserRank(null);
@@ -188,7 +174,8 @@ export default function ContestOverview() {
       setLeaderboard(rankedData);
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
-      setLeaderboardError("Failed to load leaderboard data");
+      const msg = error?.message || error?.details || JSON.stringify(error) || "Unknown error";
+      setLeaderboardError(`DB error: ${msg}`);
     } finally {
       setIsLoadingLeaderboard(false);
     }
@@ -204,14 +191,8 @@ export default function ContestOverview() {
   // Function to fetch user attempts for this contest
   const fetchUserAttempts = async (contestId) => {
     try {
-      // Get current user ID from localStorage
-      const userData = JSON.parse(localStorage.getItem("user") || "{}");
-      const currentUserId = userData?._id;
-      
-      if (!currentUserId) {
-        console.log("No user ID found in localStorage");
-        return;
-      }
+      const currentUserId = getTokenUserId();
+      if (!currentUserId) return;
 
       // Try to fetch user attempts from API
       const response = await getUserContestAttempts(contestId, currentUserId);
@@ -227,9 +208,7 @@ export default function ContestOverview() {
       console.log(`[DEBUG] Contest object:`, { attemptsAllowed: contest.attemptsAllowed, maxAttempts: contest.maxAttempts });
     } catch (error) {
       console.error("Error fetching user attempts:", error);
-      // If API fails, try to get from localStorage as fallback
-      const userData = JSON.parse(localStorage.getItem("user") || "{}");
-      const attempts = userData?.attemptsMade?.[contestId] || 0;
+      const attempts = 0;
       setUserAttempts(attempts);
       
       const attemptsAllowed = getAttemptsAllowed();
@@ -242,24 +221,27 @@ export default function ContestOverview() {
 
 
   // Fetch leaderboard data and user attempts when component mounts
+  const contestId = contest.id || contest._id
   useEffect(() => {
-    if (contest._id) {
-      fetchLeaderboard(contest._id);
-      fetchUserAttempts(contest._id);
+    if (contestId) {
+      fetchLeaderboard(contestId);
+      fetchUserAttempts(contestId);
     }
-  }, [contest._id]);
+  }, [contestId]);
 
   // Countdown timer
   useEffect(() => {
+    const endDate = contest.endTime ? new Date(contest.endTime) : null;
     const timer = setInterval(() => {
-      const now = new Date();
-      const timeLeft = new Date(Date.now() + parseInt(contest.endTime || "0") * 60 * 60 * 1000).getTime() - now.getTime();
-      
+      if (!endDate || isNaN(endDate.getTime())) {
+        setCountdown("No end date set");
+        return;
+      }
+      const timeLeft = endDate.getTime() - Date.now();
       if (timeLeft > 0) {
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-        
         setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
       } else {
         setCountdown("Contest Ended");
@@ -307,7 +289,7 @@ export default function ContestOverview() {
 
   // Helper function to get attempts allowed
   const getAttemptsAllowed = () => {
-    return contest.attemptsAllowed || contest.maxAttempts || 0;
+    return contest.attempts_allowed || contest.attemptsAllowed || contest.maxAttempts || 0;
   };
 
   return (
@@ -324,6 +306,15 @@ export default function ContestOverview() {
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
+          {/* Back navigation */}
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 mb-6 text-sm font-medium transition-opacity hover:opacity-70"
+            style={{ color: brandColors.primary }}
+          >
+            <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> Back
+          </button>
+
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -30 }}
@@ -384,17 +375,17 @@ export default function ContestOverview() {
                 <div className="text-center p-4 rounded-xl bg-white shadow-md" style={{ borderLeft: `4px solid ${brandColors.contest}` }}>
                   <Timer size={28} className="mx-auto mb-2" style={{ color: brandColors.contest }} />
                   <div className="font-bold text-xl" style={{ color: brandColors.primary }}>
-                    {contest.estimatedTime}
+                    {contest.time || contest.estimatedTime ? `${contest.time || contest.estimatedTime} min` : '—'}
                   </div>
                   <div className="text-sm text-gray-600">Duration</div>
                 </div>
-                
+
                 <div className="text-center p-4 rounded-xl bg-white shadow-md border-l-4 border-green-500">
                   <Target size={28} className="mx-auto mb-2 text-green-600" />
                   <div className="font-bold text-xl" style={{ color: brandColors.primary }}>
-                    {contest.pointsPerQuestion}
+                    {contest.points_per_question || contest.pointsPerQuestion || '—'}
                   </div>
-                  <div className="text-sm text-gray-600">Per Question</div>
+                  <div className="text-sm text-gray-600">Pts / Question</div>
                 </div>
                 
                 <div className="text-center p-4 rounded-xl bg-white shadow-md" style={{ borderLeft: `4px solid ${getDifficultyColor(contest.difficulty)}` }}>

@@ -159,36 +159,40 @@ const mockContestData = {
 };
 
 export default function Leaderboard() {
-  // const [leaderboard, setLeaderboard] = useState(mockLeaderboardData);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState(null);
-  // const [contest] = useState(mockContestData);
 
   const locator = useLocation()
 
-  const participants = locator.state.leaderBoardData.length
-
-  const currentUserEntry = locator.state.currentUserEntry
-
-  const contest = {...locator.state.contest, 
-    totalPoints:(locator.state.contest.pointsPerQuestion*locator.state.contest.questions.length),
-    maxAttempts : locator.state.contest.attemptsAllowed,
-    participants
-  }
-  
-  const leaderboard = locator.state.leaderBoardData
-  console.log(leaderboard)
-
-  
-
-  // Simulate loading effect
+  // All hooks must run before any conditional return
   useEffect(() => {
+    if (!locator.state?.contest) return
     setIsLoadingLeaderboard(true);
-    const timer = setTimeout(() => {
-      setIsLoadingLeaderboard(false);
-    }, 1000);
+    const timer = setTimeout(() => setIsLoadingLeaderboard(false), 1000);
     return () => clearTimeout(timer);
   }, []);
+
+  if (!locator.state?.contest) {
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-500">
+        No leaderboard data. Return to a contest to view rankings.
+      </div>
+    )
+  }
+
+  const participants = locator.state.leaderBoardData?.length ?? 0
+  const currentUserEntry = locator.state.currentUserEntry
+  const rawContest = locator.state.contest
+  const contest = {
+    ...rawContest,
+    totalPoints: ((rawContest.points_per_question || rawContest.pointsPerQuestion || 10) * (rawContest.questions?.length || 0)),
+    maxAttempts: rawContest.attempts_allowed || rawContest.attemptsAllowed || rawContest.maxAttempts || 0,
+    participants,
+  }
+  const leaderboard = locator.state.leaderBoardData || []
+  const gradeLabel = Array.isArray(rawContest.grade)
+    ? rawContest.grade.join(', ')
+    : (rawContest.grade || '')
 
   return (
     <div className="w-full h-full" style={{ 
@@ -217,7 +221,7 @@ export default function Leaderboard() {
                 <Trophy size={32} />
                 {contest.title} - Leaderboard
               </h1>
-              <p className="text-lg opacity-90 mt-2">Grade {contest.grade.join(', ')} Rankings</p>
+              <p className="text-lg opacity-90 mt-2">Grade {gradeLabel} Rankings</p>
             </div>
             
             {/* Full Leaderboard Table */}
@@ -286,7 +290,7 @@ export default function Leaderboard() {
                                     {isCurrentUser ? 'You' : player.name}
                                   </div>
                                   <div className="text-sm text-gray-600">
-                                    {player.time} • Grade {currentUserEntry.grade} • {player.attemptsMade} attempt{player.attemptsMade > 1 ? 's' : ''}
+                                    {player.time} • Grade {player.grade || currentUserEntry?.grade || ''} • {player.attemptsMade} attempt{player.attemptsMade > 1 ? 's' : ''}
                                   </div>
                                 </div>
                               </div>
@@ -417,19 +421,19 @@ export default function Leaderboard() {
               Your Badges
             </h4>
             <div className="flex flex-wrap gap-3">
-              <div className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-full text-sm font-medium">
-                🥉 {`${currentUserEntry.achievement.title}`}
-              </div>
-              {/* <div className="bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium">
-                ⚡ Speed Demon
-              </div>
-              {<div className="bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium">
-                🎯 First Try
-              </div>} */}
-              {currentUserEntry.rank<=10 &&
-              <div className="bg-purple-100 text-purple-800 px-3 py-2 rounded-full text-sm font-medium">
-                🏆 Top 10
-              </div>}
+              {currentUserEntry?.achievement?.title && (
+                <div className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-full text-sm font-medium">
+                  🥉 {currentUserEntry.achievement.title}
+                </div>
+              )}
+              {currentUserEntry?.rank <= 10 && (
+                <div className="bg-purple-100 text-purple-800 px-3 py-2 rounded-full text-sm font-medium">
+                  🏆 Top 10
+                </div>
+              )}
+              {!currentUserEntry?.achievement?.title && !currentUserEntry?.rank && (
+                <p className="text-sm text-gray-500">Complete the contest to earn badges.</p>
+              )}
             </div>
           </motion.div>
         </div>

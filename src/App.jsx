@@ -135,7 +135,7 @@ function App() {
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile")&&<Sidebar className="overflow-y-hidden" />}
+			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard")&&<Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				<Route index element={<LandingPages/>}/>

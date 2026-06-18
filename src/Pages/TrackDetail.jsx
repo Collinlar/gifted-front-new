@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useLocation, Link } from "react-router-dom"
-import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X } from "lucide-react"
+import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X, Zap } from "lucide-react"
 import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
 
@@ -29,11 +29,17 @@ const formatDateRange = (start, end) => {
   return start || end
 }
 
-const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel }) => (
+const CONTEST_COLOR = "#E8A020"
+
+const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel, isContest }) => (
   <div
     className="group rounded-2xl bg-white border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex flex-col"
-    style={{ borderColor: brandColors.border, opacity: gated ? 0.85 : 1 }}
+    style={{ borderColor: isContest ? CONTEST_COLOR : brandColors.border, opacity: gated ? 0.85 : 1 }}
   >
+    {/* Contest accent stripe */}
+    {isContest && (
+      <div className="h-1 w-full" style={{ backgroundColor: CONTEST_COLOR }} />
+    )}
     {image && (
       <div className="w-full h-40 overflow-hidden bg-gray-100 relative">
         <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
@@ -42,11 +48,23 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
             <Lock size={24} className="text-white" />
           </div>
         )}
+        {isContest && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: CONTEST_COLOR }}>
+            <Zap size={10} /> Contest
+          </div>
+        )}
       </div>
     )}
     <div className="p-5 flex flex-col flex-1">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-semibold line-clamp-2" style={{ color: brandColors.primary }}>{title}</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          {isContest && !image && (
+            <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: CONTEST_COLOR }}>
+              <Zap size={9} /> Contest
+            </span>
+          )}
+          <h3 className="font-semibold line-clamp-2" style={{ color: brandColors.primary }}>{title}</h3>
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           {isNew && (
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
@@ -71,7 +89,10 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
         <button
           onClick={onAction}
           className="px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
-          style={{ backgroundColor: gated ? "#E5E7EB" : color, color: gated ? brandColors.primary : "#fff" }}
+          style={{
+            backgroundColor: gated ? "#E5E7EB" : isContest ? CONTEST_COLOR : color,
+            color: gated ? brandColors.primary : "#fff",
+          }}
         >
           {actionLabel}
         </button>
@@ -79,7 +100,7 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
           <button
             onClick={onSecondaryAction}
             className="px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-gray-50"
-            style={{ borderColor: color, color }}
+            style={{ borderColor: isContest ? CONTEST_COLOR : color, color: isContest ? CONTEST_COLOR : color }}
           >
             {secondaryLabel}
           </button>
@@ -301,6 +322,7 @@ const TrackDetail = () => {
       const dateRange = formatDateRange(item.start_date, item.end_date)
       const total = (item.material_cost || 0) + (item.assessment_cost || 0)
       const registered = isRegisteredFor(item.name)
+      const isContest = Array.isArray(item.questions) && item.questions.length > 0
       return (
         <ContentCard
           key={item.id}
@@ -312,6 +334,8 @@ const TrackDetail = () => {
           priceLabel={total > 0 ? `GH₵${total}` : "Free"}
           registeredBadge={registered}
           meta={dateRange && <span>{dateRange}</span>}
+          onSecondaryAction={isContest ? () => navigate("/contest-overview", { state: { contest: item, isContest: true } }) : undefined}
+          secondaryLabel={isContest ? "Join Contest" : undefined}
         />
       )
     }
@@ -351,18 +375,29 @@ const TrackDetail = () => {
       )
     }
     const gated = isExamGated(item)
+    const isContest = item.contest === true || item.contest === "true" || item.contest === 1
+    const hasAttempts = quizDetails.some(q => q.quizId === item.id)
     return (
       <ContentCard
         key={item.id}
         title={item.title}
         color={color}
-        actionLabel={gated ? "Register for competition first" : quizDetails.some(q => q.quizId === item.id) ? "Retake Quiz" : "Start Quiz"}
-        onAction={gated ? () => setActiveTab("competitions") : () => handleExamClick(item)}
+        isContest={isContest}
+        actionLabel={
+          gated ? "Register for competition first"
+          : isContest ? "Join Contest"
+          : hasAttempts ? "Retake Quiz" : "Start Quiz"
+        }
+        onAction={
+          gated ? () => setActiveTab("competitions")
+          : isContest ? () => { localStorage.removeItem("saved-quiz"); localStorage.removeItem("saved-answers"); localStorage.removeItem("saved-time"); navigate("/contest-overview", { state: { contest: item, isContest: true } }) }
+          : () => handleExamClick(item)
+        }
         isNew={!gated && newExamIds.has(item.id)}
         image={item.image || null}
         gated={gated}
-        onSecondaryAction={!gated ? () => handleViewResults(item) : undefined}
-        secondaryLabel={!gated ? "View Results" : undefined}
+        onSecondaryAction={(!gated && !isContest && hasAttempts) ? () => handleViewResults(item) : undefined}
+        secondaryLabel={(!gated && !isContest && hasAttempts) ? "View Results" : undefined}
         meta={
           <>
             <span className="flex items-center gap-1"><FileQuestion size={12} /> {item.number_of_questions} questions</span>

@@ -335,14 +335,32 @@ export async function fetchQuizReview(userId, quizId) {
 // ─── Scores ────────────────────────────────────────────────────────────────────
 
 export async function addScore(scoreData) {
+  // exam_scores actual columns: id, mongo_id, quiz_id, grade, score, created_at, updated_at, user_id
+  // quiz_id holds the exam/contest UUID; user_id holds the Supabase auth UUID
+  const row = {
+    user_id:  scoreData.userId    || scoreData.user_id,
+    quiz_id:  scoreData.courseId  || scoreData.contest_id || scoreData.contestId || scoreData.quiz_id,
+    score:    scoreData.score,
+    grade:    scoreData.grade,
+  }
+
   const { data, error } = await supabaseAdmin
     .from('exam_scores')
-    .insert(scoreData)
+    .insert(row)
     .select()
     .single()
 
   if (error) throw error
-  return { success: true, score: data }
+
+  // Compute rank: count of rows with a strictly higher score for this contest
+  const { count } = await supabaseAdmin
+    .from('exam_scores')
+    .select('id', { count: 'exact', head: true })
+    .eq('quiz_id', row.quiz_id)
+    .gt('score', row.score)
+
+  const rank = (count || 0) + 1
+  return { success: true, score: data, rank }
 }
 
 export async function fetchAllScores() {
@@ -471,22 +489,43 @@ export async function sendMessage(formData) {
 // ─── Leaderboard / Contests ────────────────────────────────────────────────────
 
 export async function fetchContestLeaderboard(contestId) {
-  const { data, error } = await supabaseAdmin
-    .from('leaderboards')
-    .select('*, users(first_name, last_name, profile_picture)')
-    .eq('contest_id', contestId)
+  // exam_scores.user_id references auth.users (not public.users) so PostgREST cannot auto-join.
+  // Step 1: fetch scores
+  const { data: scores, error } = await supabaseAdmin
+    .from('exam_scores')
+    .select('*')
+    .eq('quiz_id', contestId)
     .order('score', { ascending: false })
     .limit(100)
 
   if (error) throw error
-  return { success: true, leaderboard: data }
+  if (!scores || scores.length === 0) return { success: true, leaderboard: [] }
+
+  // Step 2: batch-fetch names from public.users
+  const userIds = [...new Set(scores.map(s => s.user_id).filter(Boolean))]
+  const { data: users } = await supabaseAdmin
+    .from('users')
+    .select('id, first_name, last_name')
+    .in('id', userIds)
+
+  const nameMap = {}
+  ;(users || []).forEach(u => {
+    nameMap[u.id] = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Anonymous'
+  })
+
+  const leaderboard = scores.map(s => ({
+    ...s,
+    display_name: nameMap[s.user_id] || 'Anonymous',
+  }))
+
+  return { success: true, leaderboard }
 }
 
 export async function getUserContestAttempts(contestId, userId) {
   const { data, error } = await supabaseAdmin
     .from('exam_scores')
     .select('*')
-    .eq('contest_id', contestId)
+    .eq('quiz_id', contestId)
     .eq('user_id', userId)
 
   if (error) throw error

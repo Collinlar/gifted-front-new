@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useLocation , useNavigate} from 'react-router-dom';
 import { addScore } from "../lib/api"
+import { getTokenUserId } from "../lib/auth"
 
 
 // Brand colors
@@ -250,14 +251,17 @@ export default function ContestPage() {
     return html.replace(/<[^>]*>/g, '');
   };
 
-  const questions = contest.questions
-
+  const questions = contest.questions || []
+  // `time` is the exam table's duration field (minutes). `estimatedTime` was a legacy alias.
+  const totalDurationSecs = (contest.time || contest.estimatedTime ? parseInt(contest.time || contest.estimatedTime) : 10) * 60
+  const pointsPerQuestion = contest.points_per_question || contest.pointsPerQuestion || 10
+  const perQuestionSecs = 30 // default per-question timer
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [answers, setAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [contestTimer, setContestTimer] = useState(parseInt(contest.estimatedTime)* 60); // 10 minutes total
+  const [timeLeft, setTimeLeft] = useState(perQuestionSecs);
+  const [contestTimer, setContestTimer] = useState(totalDurationSecs);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -311,7 +315,7 @@ export default function ContestPage() {
     let bonus = 0;
     
     if (isCorrect) {
-      points = parseInt(contest.pointsPerQuestion); // base points
+      points = pointsPerQuestion; // base points
       // Time bonus - more points for faster answers
       if (responseTime <= 30 * 0.3) {
         bonus = 5;
@@ -344,7 +348,8 @@ export default function ContestPage() {
       timeUp
     };
 
-    setAnswers(prev => [...prev, answerData]);
+    const updatedAnswers = [...answers, answerData];
+    setAnswers(updatedAnswers);
     setSelectedAnswer(answerIndex);
     setShowResult(true);
 
@@ -353,7 +358,7 @@ export default function ContestPage() {
       if (currentQuestion < questions.length - 1) {
         nextQuestion();
       } else {
-        handleContestEnd(newScore); // Pass the calculated score
+        handleContestEnd(newScore, updatedAnswers);
       }
     }, 2500);
   };
@@ -362,14 +367,14 @@ export default function ContestPage() {
     setCurrentQuestion(prev => prev + 1);
     setSelectedAnswer(null);
     setShowResult(false);
-    setTimeLeft(questions[currentQuestion + 1]?.estimatedTime || 30);
+    setTimeLeft(questions[currentQuestion + 1]?.estimatedTime || perQuestionSecs);
     setQuestionStartTime(Date.now());
     setBonusPoints(0);
   };
 
   // Achievement calculation function
   const calculateAchievement = (finalScore, perfectStreak) => {
-    const totalPossibleScore = parseInt(contest.pointsPerQuestion) * questions.length;
+    const totalPossibleScore = pointsPerQuestion * questions.length;
     const scorePercentage = (finalScore / totalPossibleScore) * 100;
     
     // Perfect streak with score greater than total possible (with bonuses)
@@ -431,32 +436,25 @@ export default function ContestPage() {
     };
   };
 
-  const sendScoreData = async (finalScore) => {
+  const sendScoreData = async (finalScore, currentAnswers) => {
     try {
-      const userData = localStorage.getItem("user");
-      if (!userData) {
-        console.error('No user data found');
-        return;
-      }
-      
-      const user = JSON.parse(userData);
-      const totalTime = parseInt(contest.estimatedTime) * 60;
-      const timeTaken = Math.max(0, totalTime - contestTimer); // Ensure non-negative
-      
-      // Calculate if user has perfect streak
-      const perfectStreak = answers.length > 0 && answers.every(answer => answer.isCorrect);
-      
-      // Calculate achievement
+      const userId = getTokenUserId();
+      if (!userId) { console.error('No user ID found'); return; }
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const timeTaken = Math.max(0, totalDurationSecs - contestTimer);
+
+      // Use the passed-in answers array (avoids stale closure on answers state)
+      const perfectStreak = currentAnswers.length > 0 && currentAnswers.every(a => a.isCorrect);
       const achievement = calculateAchievement(finalScore, perfectStreak);
-      
+
       const scoreData = {
-        userId: user._id,
-        userName: user.userName,
-        courseId: contest._id,
+        userId,
+        userName: user.userName || user.name,
+        courseId: contest.id || contest._id,
         score: finalScore.toString(),
         timeTaken: timeTaken.toString(),
-        achievement: achievement,
-        grade: JSON.parse(localStorage.getItem("user")).grade
+        achievement,
+        grade: user.grade,
       };
 
       console.log('Final score being sent:', finalScore)
@@ -466,19 +464,18 @@ export default function ContestPage() {
         console.error('Failed to submit score');
         
       }
-      setRank(response.data.rank)
+      setRank(response.rank || 0)
     } catch (error) {
-      console.error('Error submitting score:', error);
+      console.error('Error submitting score:', error?.message || error?.details || JSON.stringify(error));
     }
   };
 
-  const handleContestEnd = (finalScore) => {
-    // Calculate achievement before sending data
-    const perfectStreak = answers.length > 0 && answers.every(answer => answer.isCorrect);
+  const handleContestEnd = (finalScore, currentAnswers) => {
+    const answersToCheck = currentAnswers || answers
+    const perfectStreak = answersToCheck.length > 0 && answersToCheck.every(a => a.isCorrect);
     const calculatedAchievement = calculateAchievement(finalScore, perfectStreak);
     setAchievement(calculatedAchievement);
-    
-    sendScoreData(finalScore);
+    sendScoreData(finalScore, answersToCheck);
     setContestComplete(true);
   };
 
@@ -607,7 +604,7 @@ export default function ContestPage() {
                   <Clock size={32} style={{ color: brandColors.accent }} />
                 </div>
                 <h3 className="font-bold text-2xl mb-1" style={{ color: brandColors.primary }}>
-                  {formatTime(Math.max(0, (parseInt(contest.estimatedTime) * 60) - contestTimer))}
+                  {formatTime(Math.max(0, totalDurationSecs - contestTimer))}
                 </h3>
                 <p className="text-gray-600">Time Taken</p>
                 <div className="mt-2 text-sm" style={{ color: brandColors.accent }}>
@@ -629,7 +626,7 @@ export default function ContestPage() {
               
               <div className="space-y-4">
                 {answers.map((answer, index) => {
-                  const question = contestQuestions[index];
+                  const question = questions[index];
                   return (
                     <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-gray-50">
                       <div className="flex items-center gap-4">
@@ -664,7 +661,7 @@ export default function ContestPage() {
                 whileTap={{ scale: 0.95 }}
                 className="px-8 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg transition-all"
                 style={{ backgroundColor: brandColors.contest, color: brandColors.white }}
-                onClick={() => window.location.reload()}
+                onClick={() => navigate('/contest-overview', { state: { contest, isContest: true } })}
               >
                 <RotateCcw size={24} />
                 Try Again
@@ -911,7 +908,7 @@ export default function ContestPage() {
                           backgroundColor: timeLeft > 10 ? brandColors.success : timeLeft > 5 ? '#FFA500' : brandColors.error
                         }}
                         initial={{ width: '100%' }}
-                        animate={{ width: `${(timeLeft / parseInt(question.estimatedTime)) * 100}%` }}
+                        animate={{ width: `${(timeLeft / (question.estimatedTime || perQuestionSecs)) * 100}%` }}
                         transition={{ duration: 0.1, ease: "linear" }}
                       />
                     </div>
@@ -959,7 +956,7 @@ export default function ContestPage() {
                       
                       <div className="text-right">
                         <div className="text-2xl font-bold" style={{ color: brandColors.contest }}>
-                          {`${contest.pointsPerQuestion} pts`}
+                          {`${pointsPerQuestion} pts`}
                         </div>
                         <div className="text-xs text-gray-500">Base Score</div>
                       </div>

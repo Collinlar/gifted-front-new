@@ -1,39 +1,29 @@
-import React from 'react';
-import { 
-  ArrowLeft, 
-  Brain, 
-  Clock,
-  Zap
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; // Assuming you're using React Router
+import React, { useEffect } from 'react';
+import { ArrowLeft, Brain, Clock, Zap } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function FlashcardsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Mock course data
-  const courseData = {
-    title: "Study Flashcards",
-    description: "Choose your study mode"
-  };
+  // CoursePage passes courseData via location state
+  const courseData = location.state || {};
+  const courseId = courseData.id || courseData._id || null;
+  const courseTitle = courseData.title || "Study Flashcards";
 
-  const handleNavigateBack = () => {
-    navigate(-1); // Go back to previous page
-    // OR navigate to specific route: navigate('/dashboard');
-  };
+  // Persist courseId so ClassicFlashcards / TimedChallenge can find it after navigation
+  useEffect(() => {
+    if (courseId) {
+      localStorage.setItem("courseId", courseId);
+    }
+  }, [courseId]);
 
   const handleStudyModeSelect = (mode) => {
-    switch(mode) {
-      case 'classic':
-        navigate('/flashcards/classic');
-        break;
-      case 'timed':
-        navigate('/flashcards/timed');
-        break;
-      case 'ai':
-        navigate('/flashcards/ai');
-        break;
-      default:
-        console.log('Unknown study mode');
+    const state = courseData;
+    switch (mode) {
+      case 'classic': navigate('/flashcards/classic', { state }); break;
+      case 'timed':   navigate('/flashcards/timed',   { state }); break;
+      case 'ai':      navigate('/flashcards/ai',      { state }); break;
     }
   };
 
@@ -42,21 +32,18 @@ export default function FlashcardsPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <button
-            onClick={handleNavigateBack}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4"
           >
             <ArrowLeft size={20} />
             Back
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {courseData.title}
-          </h1>
-          <p className="text-gray-600">{courseData.description}</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{courseTitle}</h1>
+          <p className="text-gray-600">Choose your study mode</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Classic Flashcards */}
-          <div 
+          <div
             onClick={() => handleStudyModeSelect('classic')}
             className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer border border-gray-200 hover:border-blue-300"
           >
@@ -69,8 +56,7 @@ export default function FlashcardsPage() {
             </div>
           </div>
 
-          {/* Timed Challenge */}
-          <div 
+          <div
             onClick={() => handleStudyModeSelect('timed')}
             className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer border border-gray-200 hover:border-orange-300"
           >
@@ -83,8 +69,7 @@ export default function FlashcardsPage() {
             </div>
           </div>
 
-          {/* AI-Powered Study */}
-          <div 
+          <div
             onClick={() => handleStudyModeSelect('ai')}
             className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer border border-gray-200 hover:border-purple-300"
           >
