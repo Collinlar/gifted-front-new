@@ -16,6 +16,8 @@ export default function QuizOverview() {
   const location = useLocation();
   const quizData = location.state.questions;
   const quizId = quizData._id || quizData.id;
+  const trackSlug = location.state?.trackSlug;
+  const trackName = location.state?.trackName;
   const userName = localStorage.getItem("examName");
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function QuizOverview() {
 
   const startQuiz = () => {
     setQuizStarted(true);
-    navigate("/quiz-questions", { state: { questions: quizData } });
+    navigate("/quiz-questions", { state: { questions: quizData, trackSlug, trackName } });
   };
 
   const Card = ({ children }) => (

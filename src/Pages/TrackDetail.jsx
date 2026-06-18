@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams, Link } from "react-router-dom"
-import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown } from "lucide-react"
-import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen } from "../lib/api"
+import { useNavigate, useParams, useLocation, Link } from "react-router-dom"
+import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X } from "lucide-react"
+import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
 
 const brandColors = {
@@ -29,19 +29,37 @@ const formatDateRange = (start, end) => {
   return start || end
 }
 
-const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel }) => (
+const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel }) => (
   <div
     className="group rounded-2xl bg-white border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex flex-col"
-    style={{ borderColor: brandColors.border }}
+    style={{ borderColor: brandColors.border, opacity: gated ? 0.85 : 1 }}
   >
+    {image && (
+      <div className="w-full h-40 overflow-hidden bg-gray-100 relative">
+        <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
+        {gated && (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <Lock size={24} className="text-white" />
+          </div>
+        )}
+      </div>
+    )}
     <div className="p-5 flex flex-col flex-1">
       <div className="flex items-start justify-between gap-2 mb-2">
         <h3 className="font-semibold line-clamp-2" style={{ color: brandColors.primary }}>{title}</h3>
-        {isNew && (
-          <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
-            New
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {isNew && (
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
+              New
+            </span>
+          )}
+          {registeredBadge && (
+            <span className="flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: "#1D9E75" }}>
+              <CheckCircle size={10} /> Registered
+            </span>
+          )}
+          {gated && !image && <Lock size={14} className="text-gray-400" />}
+        </div>
       </div>
       {meta && <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">{meta}</div>}
       {priceLabel && (
@@ -49,13 +67,24 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
           {priceLabel}
         </span>
       )}
-      <button
-        onClick={onAction}
-        className="mt-auto self-start px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-        style={{ backgroundColor: color }}
-      >
-        {actionLabel}
-      </button>
+      <div className="mt-auto flex flex-wrap gap-2">
+        <button
+          onClick={onAction}
+          className="px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
+          style={{ backgroundColor: gated ? "#E5E7EB" : color, color: gated ? brandColors.primary : "#fff" }}
+        >
+          {actionLabel}
+        </button>
+        {onSecondaryAction && secondaryLabel && (
+          <button
+            onClick={onSecondaryAction}
+            className="px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-gray-50"
+            style={{ borderColor: color, color }}
+          >
+            {secondaryLabel}
+          </button>
+        )}
+      </div>
     </div>
   </div>
 )
@@ -85,6 +114,7 @@ const StatCard = ({ icon, label, value, color }) => (
 const TrackDetail = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const userId = getTokenUserId()
 
   const [track, setTrack] = useState(null)
@@ -92,8 +122,22 @@ const TrackDetail = () => {
   const [quizDetails, setQuizDetails] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
-  const [activeTab, setActiveTab] = useState("competitions")
+  // Fix 3: honour ?tab= or state.tab from dashboard feed links
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "competitions")
   const [expandedTabs, setExpandedTabs] = useState({})
+
+  // Registration state
+  const [registrations, setRegistrations] = useState([])
+  const [regModal, setRegModal] = useState(null)
+  const [regGrade, setRegGrade] = useState("")
+  const [regSaving, setRegSaving] = useState(false)
+  const [regError, setRegError] = useState("")
+
+  // Results modal state
+  const [resultsModal, setResultsModal] = useState(null) // { exam } | null
+  const [resultsAttempts, setResultsAttempts] = useState([])
+  const [resultsLoading, setResultsLoading] = useState(false)
+  const [expandedAttempt, setExpandedAttempt] = useState(null) // attempt index
 
   useEffect(() => {
     const load = async () => {
@@ -103,12 +147,14 @@ const TrackDetail = () => {
         const trackRes = await getTrackBySlug(slug)
         setTrack(trackRes.track)
 
-        const [contentRes, quizRes] = await Promise.all([
+        const [contentRes, quizRes, regRes] = await Promise.all([
           getTrackContent(trackRes.track.id),
           userId ? getQuizDetails(userId) : Promise.resolve({ quizDetails: [] }),
+          userId ? getUserCompetitionRegistrations(userId) : Promise.resolve({ registrations: [] }),
         ])
         setContent(contentRes)
         setQuizDetails(quizRes.quizDetails || [])
+        setRegistrations(regRes.registrations || [])
       } catch (err) {
         console.error("Error loading track:", err)
         setError("We couldn't load this track. Try going back and selecting it again.")
@@ -117,7 +163,7 @@ const TrackDetail = () => {
       }
     }
     load()
-    setActiveTab("competitions")
+    setActiveTab(location.state?.tab || "competitions")
     setExpandedTabs({})
   }, [slug, userId])
 
@@ -157,9 +203,57 @@ const TrackDetail = () => {
 
   const color = track?.color || brandColors.secondary
 
-  const handleCompetitionClick = (competition) => navigate(`/subitem/${competition.name}`, { state: competition })
-  const handleCourseClick = (course) => navigate("/course-view", { state: course })
-  const handleExamClick = (exam) => navigate("/quiz-overview", { state: { questions: exam } })
+  const isRegisteredFor = (competitionName) =>
+    registrations.some(r => r.program === competitionName)
+
+  const handleCompetitionClick = (competition) => {
+    if (!isRegisteredFor(competition.name)) {
+      setRegModal(competition)
+      setRegGrade("")
+      setRegError("")
+      return
+    }
+    navigate(`/subitem/${competition.name}`, { state: competition })
+  }
+
+  const handleRegisterSubmit = async () => {
+    if (!userId || !regModal) return
+    setRegSaving(true)
+    setRegError("")
+    try {
+      const res = await registerForCompetition(userId, {
+        competitionId: regModal.id,
+        name: regModal.name,
+        year: regModal.year,
+        grade: regGrade,
+      })
+      setRegistrations(prev => [...prev, res.registration])
+      setRegModal(null)
+      navigate(`/subitem/${regModal.name}`, { state: regModal })
+    } catch (err) {
+      console.error("Registration error:", err)
+      setRegError("Could not complete registration. Try again.")
+    } finally {
+      setRegSaving(false)
+    }
+  }
+  const handleViewResults = async (exam) => {
+    setResultsModal(exam)
+    setResultsAttempts([])
+    setExpandedAttempt(null)
+    setResultsLoading(true)
+    try {
+      const res = await getExamAttempts(userId, exam._id || exam.id)
+      setResultsAttempts(res.attempts || [])
+    } catch (err) {
+      console.error("Could not load attempts:", err)
+    } finally {
+      setResultsLoading(false)
+    }
+  }
+
+  const handleCourseClick = (course) => navigate("/course-view", { state: { ...course, trackSlug: slug, trackName: track?.name } })
+  const handleExamClick = (exam) => navigate("/quiz-overview", { state: { questions: exam, trackSlug: slug, trackName: track?.name } })
 
   const handleCampRegister = async (campId) => {
     if (!userId) return
@@ -193,18 +287,30 @@ const TrackDetail = () => {
   const isExpanded = !!expandedTabs[activeTab]
   const visibleItems = isExpanded ? activeItems : activeItems.slice(0, PAGE_SIZE)
 
+  // Phase 3: an exam is gated if its `program` field matches a competition in
+  // this track that the user hasn't registered for yet
+  const competitionNames = new Set(content.competitions.map(c => c.name))
+  const isExamGated = (exam) => {
+    if (!exam.program) return false
+    if (!competitionNames.has(exam.program)) return false
+    return !isRegisteredFor(exam.program)
+  }
+
   const renderCard = (item) => {
     if (activeTab === "competitions") {
       const dateRange = formatDateRange(item.start_date, item.end_date)
       const total = (item.material_cost || 0) + (item.assessment_cost || 0)
+      const registered = isRegisteredFor(item.name)
       return (
         <ContentCard
           key={item.id}
           title={item.name}
           color={color}
-          actionLabel="View Details"
+          actionLabel={registered ? "Open Competition" : "Register to join"}
           onAction={() => handleCompetitionClick(item)}
+          image={item.image || null}
           priceLabel={total > 0 ? `GH₵${total}` : "Free"}
+          registeredBadge={registered}
           meta={dateRange && <span>{dateRange}</span>}
         />
       )
@@ -218,6 +324,7 @@ const TrackDetail = () => {
           color={color}
           actionLabel="Register"
           onAction={() => handleCampRegister(item.id)}
+          image={item.image || null}
           priceLabel={item.cost > 0 ? `GH₵${item.cost}` : "Free"}
           meta={
             <>
@@ -237,23 +344,30 @@ const TrackDetail = () => {
           color={color}
           actionLabel="Open Resource"
           onAction={() => handleCourseClick(item)}
+          image={item.thumbnail || null}
           priceLabel={costLabel}
           meta={item.duration && <span className="flex items-center gap-1"><Clock size={12} /> {item.duration}</span>}
         />
       )
     }
+    const gated = isExamGated(item)
     return (
       <ContentCard
         key={item.id}
         title={item.title}
         color={color}
-        actionLabel="Start Quiz"
-        onAction={() => handleExamClick(item)}
-        isNew={newExamIds.has(item.id)}
+        actionLabel={gated ? "Register for competition first" : quizDetails.some(q => q.quizId === item.id) ? "Retake Quiz" : "Start Quiz"}
+        onAction={gated ? () => setActiveTab("competitions") : () => handleExamClick(item)}
+        isNew={!gated && newExamIds.has(item.id)}
+        image={item.image || null}
+        gated={gated}
+        onSecondaryAction={!gated ? () => handleViewResults(item) : undefined}
+        secondaryLabel={!gated ? "View Results" : undefined}
         meta={
           <>
             <span className="flex items-center gap-1"><FileQuestion size={12} /> {item.number_of_questions} questions</span>
-            <span className="flex items-center gap-1"><Clock size={12} /> {item.time} min</span>
+            {item.time && <span className="flex items-center gap-1"><Clock size={12} /> {item.time} min</span>}
+            {gated && item.program && <span className="flex items-center gap-1 font-medium" style={{ color: brandColors.secondary }}><Lock size={11} /> Requires {item.program} registration</span>}
           </>
         }
       />
@@ -268,6 +382,7 @@ const TrackDetail = () => {
   }[activeTab]
 
   return (
+    <>
     <div className="min-h-screen w-full" style={{ backgroundColor: brandColors.background }}>
       {/* Colored header banner */}
       <div className="w-full py-12 px-4 sm:px-6 lg:px-8" style={{ background: `linear-gradient(135deg, ${color} 0%, ${brandColors.primary} 100%)` }}>
@@ -354,6 +469,239 @@ const TrackDetail = () => {
         </div>
       </div>
     </div>
+
+    {/* Registration modal — shown when user clicks a competition they haven't joined */}
+    {regModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="p-6 border-b flex items-start justify-between" style={{ borderColor: brandColors.border }}>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Competition Registration</p>
+              <h2 className="text-lg font-bold" style={{ color: brandColors.primary }}>{regModal.name}</h2>
+              {regModal.year && <p className="text-sm text-gray-500 mt-0.5">{regModal.year}</p>}
+            </div>
+            <button onClick={() => setRegModal(null)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <X size={18} className="text-gray-400" />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Register to access this competition and unlock any associated assessments.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Your grade</label>
+              <select
+                value={regGrade}
+                onChange={e => setRegGrade(e.target.value)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
+                style={{ borderColor: brandColors.border }}
+              >
+                <option value="">Select grade</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(g => (
+                  <option key={g} value={String(g)}>Grade {g}</option>
+                ))}
+              </select>
+            </div>
+            {regError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{regError}</p>}
+          </div>
+          <div className="px-6 pb-6 flex gap-3">
+            <button
+              onClick={handleRegisterSubmit}
+              disabled={regSaving || !regGrade}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: color }}
+            >
+              {regSaving ? "Registering..." : "Confirm registration"}
+            </button>
+            <button
+              onClick={() => setRegModal(null)}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors hover:bg-gray-50"
+              style={{ borderColor: brandColors.border, color: brandColors.primary }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Results modal — shows all attempts for a specific assessment */}
+    {resultsModal && (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40">
+        <div className="bg-white w-full sm:rounded-2xl shadow-xl sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="p-5 border-b flex items-start justify-between shrink-0" style={{ borderColor: brandColors.border }}>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-0.5">Assessment Results</p>
+              <h2 className="text-lg font-bold" style={{ color: brandColors.primary }}>{resultsModal.title}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {resultsModal.number_of_questions} questions · {resultsModal.time} min
+              </p>
+            </div>
+            <button
+              onClick={() => { setResultsModal(null); setExpandedAttempt(null) }}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
+            >
+              <X size={18} className="text-gray-400" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="overflow-y-auto flex-1 p-5">
+            {resultsLoading ? (
+              <p className="text-sm text-gray-400 text-center py-8">Loading your attempts...</p>
+            ) : resultsAttempts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400 text-sm">No attempts recorded yet.</p>
+                <p className="text-gray-300 text-xs mt-1">Use the button below to take this quiz for the first time.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {resultsAttempts.map((attempt, idx) => {
+                  const pct = attempt.score !== null ? attempt.score : null
+                  const isExpanded = expandedAttempt === idx
+                  const scoreColor = pct === null ? "#9CA3AF" : pct >= 70 ? "#16A34A" : pct >= 50 ? "#D97706" : "#DC2626"
+
+                  return (
+                    <div key={attempt.id} className="border rounded-xl overflow-hidden" style={{ borderColor: brandColors.border }}>
+                      {/* Attempt row */}
+                      <div className="p-4 flex items-center gap-4">
+                        {/* Attempt number */}
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                          style={{ backgroundColor: color }}>
+                          {resultsAttempts.length - idx}
+                        </div>
+
+                        {/* Score ring */}
+                        <div className="relative w-12 h-12 shrink-0">
+                          <svg className="w-full h-full -rotate-90" viewBox="0 0 44 44">
+                            <circle cx="22" cy="22" r="18" fill="none" stroke="#F3F4F6" strokeWidth="5" />
+                            {pct !== null && (
+                              <circle cx="22" cy="22" r="18" fill="none"
+                                stroke={scoreColor} strokeWidth="5" strokeLinecap="round"
+                                strokeDasharray={`${2 * Math.PI * 18}`}
+                                strokeDashoffset={`${2 * Math.PI * 18 * (1 - pct / 100)}`}
+                              />
+                            )}
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold" style={{ color: scoreColor }}>
+                            {pct !== null ? `${pct}%` : "—"}
+                          </span>
+                        </div>
+
+                        {/* Meta */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold" style={{ color: brandColors.primary }}>
+                            {idx === 0 ? "Latest attempt" : `Attempt ${resultsAttempts.length - idx}`}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{attempt.date}</p>
+                          {pct !== null && attempt.totalQuestions && (
+                            <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden w-full max-w-[160px]">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: scoreColor }} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Expand toggle */}
+                        {attempt.review && (
+                          <button
+                            onClick={() => setExpandedAttempt(isExpanded ? null : idx)}
+                            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
+                            style={{ borderColor: color, color }}
+                          >
+                            {isExpanded ? "Hide" : "Review"}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expanded per-question review */}
+                      {isExpanded && attempt.review && (
+                        <div className="border-t px-4 pb-4 space-y-3 bg-gray-50" style={{ borderColor: brandColors.border }}>
+                          {/* Summary bar */}
+                          <div className="flex gap-6 py-3 text-sm">
+                            <span className="text-green-600 font-semibold">
+                              ✓ {attempt.review.filter(q => q.isCorrect).length} correct
+                            </span>
+                            <span className="text-red-500 font-semibold">
+                              ✗ {attempt.review.filter(q => !q.isCorrect && q.selectedAnswer).length} incorrect
+                            </span>
+                            <span className="text-gray-400 font-semibold">
+                              — {attempt.review.filter(q => !q.selectedAnswer).length} skipped
+                            </span>
+                          </div>
+
+                          {attempt.review.map((q, qi) => {
+                            const clean = (s) => (s || "").replace(/<[^>]*>?/gm, "")
+                            return (
+                              <div
+                                key={qi}
+                                className={`p-3 rounded-xl border text-sm ${
+                                  !q.selectedAnswer ? "bg-white border-gray-200 text-gray-400"
+                                  : q.isCorrect ? "bg-green-50 border-green-300"
+                                  : "bg-red-50 border-red-300"
+                                }`}
+                              >
+                                <div className="flex items-start gap-2 mb-1">
+                                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 ${
+                                    !q.selectedAnswer ? "bg-gray-200 text-gray-500"
+                                    : q.isCorrect ? "bg-green-600 text-white"
+                                    : "bg-red-500 text-white"
+                                  }`}>
+                                    {!q.selectedAnswer ? "—" : q.isCorrect ? "✓" : "✗"}
+                                  </span>
+                                  <p className="font-medium text-gray-800 leading-snug">{clean(q.question)}</p>
+                                </div>
+                                {q.image && <img src={q.image} alt="" className="my-2 w-full max-h-32 object-contain rounded" />}
+                                <div className="ml-7 space-y-0.5 text-xs">
+                                  {q.selectedAnswer && (
+                                    <p><span className="text-gray-500">Your answer: </span>
+                                      <span className={q.isCorrect ? "text-green-700 font-medium" : "text-red-600 font-medium"}>
+                                        {clean(q.selectedAnswer)}
+                                      </span>
+                                    </p>
+                                  )}
+                                  {!q.isCorrect && q.correctAnswer && (
+                                    <p><span className="text-gray-500">Correct: </span>
+                                      <span className="text-green-700 font-medium">{clean(q.correctAnswer)}</span>
+                                    </p>
+                                  )}
+                                  {q.explanation && (
+                                    <p className="mt-1 text-gray-500 italic">{clean(q.explanation)}</p>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t flex gap-3 shrink-0" style={{ borderColor: brandColors.border }}>
+            <button
+              onClick={() => { setResultsModal(null); handleExamClick(resultsModal) }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: color }}
+            >
+              {resultsAttempts.length > 0 ? "Retake Quiz" : "Start Quiz"}
+            </button>
+            <button
+              onClick={() => { setResultsModal(null); setExpandedAttempt(null) }}
+              className="px-5 py-2.5 rounded-xl text-sm font-medium border transition-colors hover:bg-gray-50"
+              style={{ borderColor: brandColors.border, color: brandColors.primary }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

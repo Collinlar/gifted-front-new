@@ -1,1504 +1,632 @@
 "use client"
 
-// Core React/Next.js imports
 import { useState, useEffect, useRef } from "react"
-
-// UI/Animation libraries
+import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Award, 
-  Edit2, 
-  Save, 
-  X, 
-  Camera, 
-  Calendar, 
-  BookOpen, 
-  Zap, 
-  Clock, 
-  Star,
-  Lock,
-  Settings,
-  Activity,
-  Edit,
-  GraduationCap,
-  Target,
-  Key
+import {
+  User, Mail, Phone, MapPin, Edit, Camera,
+  Calendar, BookOpen, Zap, Clock, Star,
+  Lock, Activity, GraduationCap, Target, Key,
+  Award, ArrowRight, CheckCircle, AlertCircle,
 } from "lucide-react"
-
-// Custom Components
-import Sidebar from "../Components/common/Sidebar"; // Import the Sidebar
-import { jwtDecode } from "jwt-decode";
-
-// Brand colors - matching sidebar for consistency (Ideally, centralize these)
-const brandColors = {
-  primary: "#003366",
-  primaryLight: "#004080",
-  secondary: "#336699",
-  secondaryLight: "#4080BF",
-  accent: "#6699CC",
-  accentLight: "#85B8E5",
-  background: "#F0F4F8",
-  text: "#333333",
-  white: "#FFFFFF",
-  gray: "#E5E7EB",
-  success: "#4CAF50",
-  warning: "#FFC107",
-  error: "#F44336"
-}
+import { jwtDecode } from "jwt-decode"
 import { getUserDetails, updateUserDetails, updateProfilePicture, updateCoverImage } from "../lib/api"
 import { resetPassword, getTokenUserId } from "../lib/auth"
 
-// const user =  ||{}
+const brandColors = {
+  primary: "#003366",
+  secondary: "#336699",
+  accent: "#6699CC",
+  background: "#F0F4F8",
+  border: "#E5E7EB",
+  success: "#1D9E75",
+  error: "#EF4444",
+}
 
-const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  
-  
-  console.log(months);
-  
-// Mock user data - in a real app this would come from auth context or API
+const TABS = ["overview", "userDetails", "security"]
+const TAB_LABELS = { overview: "Overview", userDetails: "User Details", security: "Security" }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// const userProfile = {
-//   name: `${tokenDisplay().firstName} ${tokenDisplay().lastName}`,
-//   role: `${tokenDisplay().category}`,
-//   email: `${tokenDisplay().category}`,
-//   phone: `${tokenDisplay().mobile}`,
-//   location: `${tokenDisplay().location}`,
-//   joined: `${tokenDisplay().joined?.split("-")[2].split("T")[0]}-${months[tokenDisplay().joined?.split("-")[1]-1]}-${tokenDisplay().joined?.split("-")[0]}`,
-//   avatarUrl: null,
-//   bio: "Passionate about cognitive development and advanced learning techniques. I enjoy solving complex problems and exploring new educational concepts.",
-//   skills: ["Critical Thinking", "Creative Problem Solving", "Mathematical Reasoning", "Spatial Recognition", "Pattern Analysis"],
-//   achievements: [
-//     { id: 1, title: "Logic Master", description: "Completed all logic puzzles with 100% accuracy", date: "March 2024", icon: "Zap" },
-//     { id: 2, title: "Consistent Learner", description: "Maintained a 30-day learning streak", date: "January 2024", icon: "Clock" },
-//     { id: 3, title: "Top Contributor", description: "Ranked in the top 5% of community contributors", date: "February 2024", icon: "Star" }
-//   ],
-//   stats: {
-//     programsCompleted: 7,
-//     assessmentsTaken: 12,
-//     averageScore: 92,
-//     hoursSpent: 48,
-//     streak: 14
-//   },
-//   recentActivities: [
-//     { id: 1, type: "assessment", title: "Completed Spatial Reasoning Assessment", date: "2 days ago" },
-//     { id: 2, type: "program", title: "Started Advanced Pattern Recognition", date: "4 days ago" },
-//     { id: 3, type: "community", title: "Posted a solution to 'Logical Paradox Challenge'", date: "1 week ago" },
-//     { id: 4, type: "learning", title: "Completed Module 3: Abstract Reasoning", date: "1 week ago" }
-//   ],
-//   recommendedPrograms: [
-//     { id: 1, title: "Advanced Mathematical Thinking", completion: 0, match: 98 },
-//     { id: 2, title: "Creative Problem-Solving Workshop", completion: 0, match: 95 },
-//     { id: 3, title: "Visual-Spatial Intelligence Development", completion: 0, match: 92 }
-//   ]
-// }
+const getInitials = (name) =>
+  (name || "").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
+
+const getActivityIcon = (type) =>
+  ({ assessment: Activity, program: BookOpen, community: User, learning: Zap })[type] || Clock
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const DetailRow = ({ label, value, fieldName, onEdit, accentColor = "blue" }) => (
+  <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
+    <span className="text-gray-600 font-medium">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className="text-gray-900 font-semibold">{value || "Not set"}</span>
+      <button
+        onClick={() => onEdit(fieldName)}
+        className="p-1 rounded transition-colors hover:bg-gray-100"
+        title={`Edit ${label.toLowerCase()}`}
+      >
+        <Edit className="w-3 h-3 text-gray-400 hover:text-gray-700" />
+      </button>
+    </div>
+  </div>
+)
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const Profile = () => {
-  const [isEditing, setIsEditing] = useState(false)
-  const [profile, setProfile] = useState({})
-  const [tempProfile, setTempProfile] = useState({})
+  const navigate = useNavigate()
+  const userId = getTokenUserId()
+
   const [activeTab, setActiveTab] = useState("overview")
+  const [userDetails, setUserDetails] = useState({})
+  const [profile, setProfile] = useState({})
+  const [profileImage, setProfileImage] = useState(null)
+  const [profileImageLoading, setProfileImageLoading] = useState(true)
+
+  // Inline field editing
   const [editingField, setEditingField] = useState(null)
   const [formData, setFormData] = useState({})
   const [passwordVisible, setPasswordVisible] = useState(false)
-  const [userDetails, setUserDetails] = useState({})
-  const [showRegistered, setShowRegistered] = useState(false)
-  const [showAddOns, setShowAddOns] = useState(false)
-  const [showInvoice, setShowInvoice] = useState(false)
-  const [showPaid, setShowPaid] = useState(false)
-  const [profileImage, setProfileImage] = useState(null)
-  const [profileImageLoading, setProfileImageLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
+  const [saveSuccess, setSaveSuccess] = useState("")
+
+  // Password form (Security tab)
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" })
+  const [pwError, setPwError] = useState("")
+  const [pwSuccess, setPwSuccess] = useState("")
+  const [pwSaving, setPwSaving] = useState(false)
 
   const profileInputRef = useRef(null)
   const coverInputRef = useRef(null)
 
-
-  // setUpdate(true)
- 
- 
-
- 
+  // Load user data
   useEffect(() => {
-    const LoadUserDetails = async () => {
+    if (!userId) return
+    const load = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const userId = getTokenUserId();
-        const response = await getUserDetails(userId);
-        if (response.success) {
-          setUserDetails(response.user);
+        const res = await getUserDetails(userId)
+        if (res.success) {
+          setUserDetails(res.user)
+          setProfileImage(res.user.profile_picture || res.user.profilePicture || null)
+
+          const token = localStorage.getItem("token")
+          const decoded = token ? jwtDecode(token) : null
+          const createdAt = res.user.created_at || res.user.createdAt
+          const joined = createdAt
+            ? new Date(createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+            : ""
+
+          setProfile({
+            name: `${res.user.firstName || ""} ${res.user.lastName || ""}`.trim() || decoded?.name || "",
+            email: res.user.email || decoded?.email || "",
+            role: res.user.category || res.user.Category || decoded?.category || "Student",
+            phone: res.user.mobileNumber || decoded?.mobile || "",
+            location: res.user.country || decoded?.location || "",
+            joined,
+            coverImage: res.user.cover_image || res.user.coverImage || null,
+          })
         }
       } catch (err) {
-        console.error("Error loading user details:", err);
+        console.error("Failed to load profile:", err)
+      } finally {
+        setProfileImageLoading(false)
       }
-    };
-
-    LoadUserDetails();
-    fetchProfileImage();
-  }, [editingField]);
-
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("user"));
-    const token = localStorage.getItem("token");
-    const decoded = token ? jwtDecode(token) : null;
-    const performance = JSON.parse(localStorage.getItem("performance")) || [];
-    const learning = JSON.parse(localStorage.getItem("learning")) || [];
-
-    const createdAt = storedUser?.createdAt;
-    const formattedDate = createdAt
-      ? new Date(createdAt).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "";
-
-    const recent = performance.map((item, id) => ({
-      id,
-      type: "assessment",
-      title: item.title,
-      date: item.date,
-    }));
-
-    const learningAnalytics = learning.map((item, id) => ({
-      id,
-      type: "program",
-      title: item.title,
-      date: item.date,
-      completed: item.completed,
-    }));
-
-    const recentActivities = [...recent, ...learningAnalytics];
-
-    const performanceAchievement = performance.filter((item) => item.score === 100);
-    const learningAchievement = learningAnalytics.filter((item) => item.completed === true);
-
-    const performanceArray = performanceAchievement.map((item, id) => ({
-      id,
-      description: `A perfect score in ${item.title} assessment`,
-      title: "Score Master",
-      date: item.date,
-      icon: "Star",
-    }));
-
-    const learningArray = learningAchievement.map((item, id) => ({
-      id,
-      description: `Completed a course in ${item.title}`,
-      title: "Study Master",
-      date: item.date,
-      icon: "Star",
-    }));
-
-    const achievements = [...learningArray, ...performanceArray];
-
-    const skills = Array.isArray(storedUser?.purposeOfRegistrations) ? storedUser.purposeOfRegistrations : [];
-
-    const userProfile = {
-      name: storedUser?.firstName || storedUser?.lastName ? `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() : decoded ? `${decoded.firstName || ""} ${decoded.lastName || ""}`.trim() : "",
-      email: storedUser?.email || decoded?.email || "",
-      role: storedUser?.Category || decoded?.category || "",
-      phone: storedUser?.mobileNumber || decoded?.mobile || "",
-      location: storedUser?.country || decoded?.location || "",
-      joined: formattedDate ? formattedDate.replace(/ /g, "-") : "",
-      skills,
-      recentActivities,
-      achievements,
-      recommendedPrograms: [
-        { id: 1, title: "Advanced Mathematical Thinking", completion: 0, match: 98 },
-        { id: 2, title: "Creative Problem-Solving Workshop", completion: 0, match: 95 },
-        { id: 3, title: "Visual-Spatial Intelligence Development", completion: 0, match: 92 },
-      ],
-      stats: {
-        programsCompleted: 7,
-        assessmentsTaken: 12,
-        averageScore: 92,
-        hoursSpent: 48,
-        streak: 14,
-      },
-    };
-
-    setTempProfile(userProfile);
-    setProfile(userProfile);
-  }, []);
-  
-  
-
-  // --- State Handlers ---
-  const handleInputChange = async(field, value) => {
-    const token = localStorage.getItem("token")
-    const userId = getTokenUserId()
-    setTempProfile(prev => ({ ...prev, [field]: value }))
-
-    await updateUserDetails(userId, tempProfile);
-
-  }
-
-  const handleSkillChange = (index, value) => {
-    const newSkills = [...tempProfile.skills]
-    newSkills[index] = value
-    setTempProfile(prev => ({ ...prev, skills: newSkills }))
-  }
-
-  const addSkill = () => {
-    setTempProfile(prev => ({ ...prev, skills: [...prev.skills, ""] }))
-  }
-
-  const removeSkill = (index) => {
-    const newSkills = [...tempProfile.skills]
-    newSkills.splice(index, 1)
-    setTempProfile(prev => ({ ...prev, skills: newSkills }))
-  }
-
-  const saveChanges = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const userId = getTokenUserId();
-      
-      // Check if email has changed
-      if (tempProfile.email !== profile.email) {
-        await updateUserDetails(userId, { email: tempProfile.email });
-        alert('Email updated successfully!');
-      }
-      
-      // Update local state
-      console.log("Saving profile:", tempProfile);
-      setProfile(tempProfile);
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Error updating profile:", err);
-      alert('Failed to update profile. Please try again.');
     }
-  }
+    load()
+  }, [userId, editingField])
 
-  const cancelEditing = () => {
-    setTempProfile(profile) // Reset temp state to original profile
-    setIsEditing(false)
-  }
+  // ─── Field edit modal ──────────────────────────────────────────────────────
 
-  // User Details Editing Functions
   const openEditModal = (fieldName) => {
-    setFormData(fieldName === "password"
-      ? { oldPassword: "", newPassword: "", confirmPassword: "" }
-      : { [fieldName]: userDetails[fieldName] || "" });
-    setEditingField(fieldName);
-  };
+    setSaveError("")
+    setSaveSuccess("")
+    setFormData(
+      fieldName === "password"
+        ? { oldPassword: "", newPassword: "", confirmPassword: "" }
+        : { [fieldName]: userDetails[fieldName] || "" }
+    )
+    setEditingField(fieldName)
+  }
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  // Fetch profile image
-  const fetchProfileImage = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const userId = getTokenUserId();
-      const response = await getUserDetails(userId);
-      if (response.user?.profile_picture) {
-        setProfileImage(response.user.profile_picture);
-      }
-    } catch (err) {
-      console.error("Error fetching profile image:", err);
-    } finally {
-      setProfileImageLoading(false);
-    }
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value })
 
   const handleSave = async () => {
-    const token = localStorage.getItem("token");
-    const userId = getTokenUserId();
+    setSaveError("")
+    setSaveSuccess("")
+    setSaving(true)
 
     if (editingField === "password") {
-      const { oldPassword, newPassword, confirmPassword } = formData;
-      if (!oldPassword || !newPassword || !confirmPassword) return alert("All password fields are required.");
-      if (newPassword !== confirmPassword) return alert("New passwords do not match.");
-
-      try {
-        const res = await resetPassword({ password: newPassword });
-        alert(res.message);
-        setEditingField(null);
-      } catch (err) {
-        alert("Failed to update password.");
+      const { oldPassword, newPassword, confirmPassword } = formData
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        setSaveError("All password fields are required.")
+        setSaving(false)
+        return
       }
-      return;
+      if (newPassword !== confirmPassword) {
+        setSaveError("New passwords do not match.")
+        setSaving(false)
+        return
+      }
+      try {
+        const res = await resetPassword({ password: newPassword })
+        setSaveSuccess(res.message || "Password updated.")
+        setTimeout(() => setEditingField(null), 1500)
+      } catch {
+        setSaveError("Failed to update password.")
+      }
+      setSaving(false)
+      return
     }
 
-    const updatedFields = {};
-    if (formData[editingField] && formData[editingField] !== userDetails[editingField]) {
-      updatedFields[editingField] = formData[editingField];
-    }
-    if (Object.keys(updatedFields).length === 0) {
-      alert("No changes detected.");
-      setEditingField(null);
-      return;
+    const value = formData[editingField]
+    if (!value || value === userDetails[editingField]) {
+      setSaveError("No changes detected.")
+      setSaving(false)
+      return
     }
 
     try {
-      await updateUserDetails(userId, updatedFields);
-      setEditingField(null);
-    } catch (err) {
-      alert("An error occurred while updating your info.");
+      await updateUserDetails(userId, { [editingField]: value })
+      setSaveSuccess("Saved.")
+      setTimeout(() => setEditingField(null), 800)
+    } catch {
+      setSaveError("Could not save. Try again.")
     }
-  };
-
-  const renderEditButton = (fieldName) => (
-    <button
-      className="ml-2 px-3 py-1 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow"
-      onClick={() => openEditModal(fieldName)}
-    >
-      Edit
-    </button>
-  );
-
-  // --- Helper Functions ---
-  const getInitials = (name) => {
-    if (!name) return "";
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .slice(0, 2) // Ensure max 2 initials
-      .join('')
-      .toUpperCase()
+    setSaving(false)
   }
 
-  const getIconComponent = (iconName, defaultIcon = Award) => {
-    const iconMap = { Zap, Clock, Star, Activity, BookOpen, User, Lock, Settings };
-    return iconMap[iconName] || defaultIcon;
+  // ─── Security tab password form ────────────────────────────────────────────
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault()
+    setPwError("")
+    setPwSuccess("")
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
+      setPwError("All fields are required.")
+      return
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError("New passwords do not match.")
+      return
+    }
+    if (pwForm.next.length < 8) {
+      setPwError("New password must be at least 8 characters.")
+      return
+    }
+    setPwSaving(true)
+    try {
+      const res = await resetPassword({ password: pwForm.next })
+      setPwSuccess(res.message || "Password updated successfully.")
+      setPwForm({ current: "", next: "", confirm: "" })
+    } catch {
+      setPwError("Failed to update password. Try again.")
+    }
+    setPwSaving(false)
   }
 
-  const getAchievementIcon = (iconName) => getIconComponent(iconName, Award);
-  const getActivityIcon = (type) => {
-    const typeMap = { assessment: Activity, program: BookOpen, community: User, learning: Zap };
-    return typeMap[type] || Clock;
-  };
+  // ─── Image upload handlers ─────────────────────────────────────────────────
 
-  // --- Render Logic ---
+  const handleProfileImageChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const res = await updateProfilePicture(userId, file)
+      if (res.url) setProfileImage(res.url)
+    } catch (err) {
+      console.error("Profile image update failed:", err)
+    }
+    e.target.value = ""
+  }
+
+  const handleCoverImageChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const res = await updateCoverImage(userId, file)
+      if (res.url) setProfile((p) => ({ ...p, coverImage: res.url }))
+    } catch (err) {
+      console.error("Cover image update failed:", err)
+    }
+    e.target.value = ""
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
-    // Parent container using Flexbox for Sidebar + Main Content layout
-    <div className="flex min-h-screen w-full" style={{ backgroundColor: brandColors.background }}>
-      {/* Sidebar Component */}
-      {/* The Sidebar component needs to be compatible with this layout. */}
-      {/* It should handle its own width and responsiveness. */}
-      {/* Assuming the Sidebar component is correctly set up for flex layout (fixed width or relative) */}
-      <Sidebar /> 
+    <div className="min-h-screen w-full px-4 sm:px-6 lg:px-8 py-8" style={{ backgroundColor: brandColors.background }}>
+      <div className="max-w-5xl mx-auto">
 
-      {/* Main Content Area */}
-      {/* `flex-1` makes this take the remaining width */}
-      {/* `overflow-y-auto` allows content scrolling independently of the sidebar */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          
-          {/* Header section */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900" style={{ color: brandColors.primary }}>My Profile</h1>
-            <p className="mt-2 text-gray-600">Manage your personal information and track your progress</p>
-          </div>
-          
-          {/* Tabs */}
-          <div className="mb-6 border-b border-gray-200">
-            <nav className="flex space-x-8" aria-label="Tabs">
-              {["overview","userDetails","preferences","security"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-150 ease-in-out ${
-                    activeTab === tab 
-                      ? 'border-blue-500 text-blue-600' 
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                  style={
-                    activeTab === tab 
-                      ? { borderColor: brandColors.accent, color: brandColors.primary } 
-                      : { color: brandColors.secondary }
-                  }
-                  aria-current={activeTab === tab ? 'page' : undefined}
-                >
-                  {tab === "userDetails" ? "User Details" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </nav>
-          </div>
-          
-          {/* Tab Content - Render based on activeTab */}
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold" style={{ color: brandColors.primary }}>My Profile</h1>
+          <p className="mt-1 text-gray-500">Manage your personal information and track your progress</p>
+        </div>
 
-          {/* Overview Tab */}
-          {activeTab === "overview" && (
-            <motion.div // Wrap tab content in motion.div for potential tab transition animations
-              key="overview"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-            >
-              {/* Left column - Main profile information */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Profile Card */}
-                <motion.div 
-                  className="bg-white rounded-lg shadow overflow-hidden"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
+        {/* Tabs */}
+        <div className="border-b mb-8" style={{ borderColor: brandColors.border }}>
+          <nav className="flex gap-6">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="py-3 text-sm font-medium border-b-2 transition-colors -mb-px"
+                style={{
+                  borderBottomColor: activeTab === tab ? brandColors.primary : "transparent",
+                  color: activeTab === tab ? brandColors.primary : brandColors.secondary,
+                }}
+              >
+                {TAB_LABELS[tab]}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* ── Overview Tab ──────────────────────────────────────────────────── */}
+        {activeTab === "overview" && (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+          >
+            {/* Profile card */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl shadow overflow-hidden">
+                {/* Cover */}
+                <div
+                  className="h-32 w-full relative"
+                  style={{
+                    backgroundImage: profile.coverImage
+                      ? `url(${profile.coverImage})`
+                      : `linear-gradient(135deg, ${brandColors.primary} 0%, ${brandColors.accent} 100%)`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
                 >
-                  {/* Cover photo / header */}
-                  <div 
-                    className="h-32 w-full relative"
-                    style={{ 
-                      backgroundImage: profile.coverImage 
-                        ? `url(${profile.coverImage}?t=${Date.now()})` 
-                        : `linear-gradient(to right, ${brandColors.primary}, ${brandColors.accent})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
+                  <button
+                    onClick={() => coverInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow hover:bg-gray-100 transition-colors"
+                    title="Change cover photo"
                   >
-                    <button 
-                      className="absolute bottom-2 right-2 bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors border-2 border-gray-200"
-                      title="Change cover photo"
-                      aria-label="Change cover photo"
-                      onClick={() => coverInputRef.current && coverInputRef.current.click()}
-                    >
-                      <Camera size={20} className="text-gray-600" />
-                    </button>
-                    {/* Hidden input for cover image upload */}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      ref={coverInputRef}
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files && e.target.files[0]
-                        if (!file) return
-                        try {
-                          const token = localStorage.getItem("token")
-                          const userId = getTokenUserId()
-                          const res = await updateCoverImage(userId, file)
-                          if (res.url) {
-                            setProfile((prev) => ({ ...prev, coverImage: res.url }))
-                            setTempProfile((prev) => ({ ...prev, coverImage: res.url }))
-                            alert('Cover image updated successfully!')
-                          }
-                        } catch (err) {
-                          console.error('Error updating cover image', err)
-                          alert('Failed to update cover image. Please try again.')
-                        } finally {
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Profile section */}
-                  <div className="px-4 pt-0 pb-5 relative">
-                    {/* Avatar */}
-                    <div className="relative -mt-16 mb-4">
-                      <div 
-                        className="w-32 h-32 mx-auto rounded-full border-4 flex items-center justify-center relative text-white overflow-hidden"
-                        style={{ 
-                          backgroundColor: profileImage ? brandColors.gray : brandColors.accent,
-                          borderColor: brandColors.white
-                        }}
-                      >
-                        {profileImageLoading ? (
-                          <div className="flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                          </div>
-                        ) : profileImage ? (
-                          <img 
-                            src={`${profileImage}?t=${Date.now()}`} 
-                            alt={`${profile.name}'s avatar`} 
-                            className="w-full h-full rounded-full object-cover"
-                            onError={() => setProfileImage(null)}
-                          />
-                        ) : (
-                          <span className="text-4xl font-bold">{getInitials(profile.name)}</span>
-                        )}
-                        
-                        <button 
-                          className="absolute bottom-0 right-0 bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors border-2 border-gray-200"
-                          title="Change profile picture"
-                          aria-label="Change profile picture"
-                          onClick={() => profileInputRef.current && profileInputRef.current.click()}
-                        >
-                          <Camera size={20} className="text-gray-600" />
-                        </button>
-                        {/* Hidden input for profile image upload */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={profileInputRef}
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files && e.target.files[0]
-                            if (!file) return
-                            try {
-                              const token = localStorage.getItem("token")
-                              const userId = getTokenUserId()
-                              const res = await updateProfilePicture(userId, file)
-                              if (res.url) {
-                                setProfile((prev) => ({ ...prev, avatarUrl: res.url }))
-                                setTempProfile((prev) => ({ ...prev, avatarUrl: res.url }))
-                                setProfileImage(`${res.url}?t=${Date.now()}`)
-                                alert('Profile image updated successfully!')
-                              }
-                            } catch (err) {
-                              console.error('Error updating profile image', err)
-                              alert('Failed to update profile image. Please try again.')
-                            } finally {
-                              e.target.value = ''
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Edit/Save buttons */}
-                    <div className="absolute top-4 right-4 flex space-x-2">
-                      {isEditing ? (
-                        <>
-                          <motion.button 
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={saveChanges}
-                            className="p-2 rounded-md text-white shadow"
-                            style={{ backgroundColor: brandColors.success }}
-                            title="Save changes" aria-label="Save changes"
-                          >
-                            <Save size={16} />
-                          </motion.button>
-                          <motion.button 
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={cancelEditing}
-                            className="p-2 rounded-md text-white shadow"
-                            style={{ backgroundColor: brandColors.error }}
-                            title="Cancel editing" aria-label="Cancel editing"
-                          >
-                            <X size={16} />
-                          </motion.button>
-                        </>
-                      ) : (
-                        <motion.button 
-                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                          onClick={() => setIsEditing(true)}
-                          className="p-2 rounded-md text-white shadow"
-                          style={{ backgroundColor: brandColors.secondary }}
-                          title="Edit profile" aria-label="Edit profile"
-                        >
-                          <Edit2 size={16} />
-                        </motion.button>
-                      )}
-                    </div>
-                    
-                    {/* Name and role */}
-                    <div className="text-center mb-4 mt-2">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={tempProfile.name}
-                          onChange={(e) => handleInputChange('userName', e.target.value)}
-                          className="text-xl font-bold text-center w-full mb-1 p-1 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500 rounded-t-md"
-                          style={{ color: brandColors.text }}
-                          aria-label="Edit name"
-                        />
-                      ) : (
-                        <h2 className="text-xl font-bold" style={{ color: brandColors.text }}>{profile.name}</h2>
-                      )}
-                      
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={tempProfile.role}
-                          onChange={(e) => handleInputChange('Category', e.target.value)}
-                          className="text-sm text-center w-full p-1 border-b-2 border-gray-300 focus:outline-none focus:border-blue-500 rounded-t-md"
-                          style={{ color: brandColors.secondary }}
-                           aria-label="Edit role"
-                        />
-                      ) : (
-                        <p className="text-sm" style={{ color: brandColors.secondary }}>{profile.role}</p>
-                      )}
-                    </div>
-                    
-                    {/* Contact information */}
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center text-gray-600">
-                        <Mail size={16} className="text-gray-400 mr-3 flex-shrink-0" />
-                        {isEditing ? (
-                          <input
-                            type="email"
-                            value={tempProfile.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            className="flex-1 p-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 min-w-0"
-                            aria-label="Edit email"
-                          />
-                        ) : (
-                          <span className="truncate">{profile.email}</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center text-gray-600">
-                        <Phone size={16} className="text-gray-400 mr-3 flex-shrink-0" />
-                        {isEditing ? (
-                          <input
-                            type="tel"
-                            value={tempProfile.phone}
-                            onChange={(e) => handleInputChange('mobileNumber', e.target.value)}
-                            className="flex-1 p-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 min-w-0"
-                             aria-label="Edit phone number"
-                          />
-                        ) : (
-                          <span className="truncate">{profile.phone}</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center text-gray-600">
-                        <MapPin size={16} className="text-gray-400 mr-3 flex-shrink-0" />
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={tempProfile.location}
-                            onChange={(e) => handleInputChange('country', e.target.value)}
-                            className="flex-1 p-1 border-b border-gray-300 focus:outline-none focus:border-blue-500 min-w-0"
-                             aria-label="Edit location"
-                          />
-                        ) : (
-                          <span className="truncate">{profile.location}</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center text-gray-600">
-                        <Calendar size={16} className="text-gray-400 mr-3 flex-shrink-0" />
-                        <span>Member since {profile.joined}</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-                
-                {/* Bio Section */}
-                {/* <motion.div 
-                  className="bg-white rounded-lg shadow p-5"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                >
-                  <h3 className="text-lg font-medium mb-3" style={{ color: brandColors.primary }}>About Me</h3>
-                  {isEditing ? (
-                    <textarea
-                      value={tempProfile.bio}
-                      onChange={(e) => handleInputChange('bio', e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-700"
-                      rows={5}
-                      aria-label="Edit bio"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-600 leading-relaxed">{profile.bio || "No bio provided."}</p>
-                  )}
-                </motion.div> */}
-                
-                {/* Skills Section */}
-                {/* <motion.div 
-                  className="bg-white rounded-lg shadow p-5"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                >
-                  <h3 className="text-lg font-medium mb-3" style={{ color: brandColors.primary }}>Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(isEditing ? tempProfile.skills : profile.skills).map((skill, index) => (
-                      <div 
-                        key={index}
-                        className={`px-3 py-1 rounded-full text-sm flex items-center group ${ isEditing ? 'border border-dashed border-transparent hover:border-gray-300' : '' }`}
-                        style={{ 
-                          backgroundColor: brandColors.accent + '20',
-                          color: brandColors.primary
-                        }}
-                      >
-                        {isEditing ? (
-                          <>
-                            <input
-                              type="text"
-                              value={skill}
-                              onChange={(e) => handleSkillChange(index, e.target.value)}
-                              className="bg-transparent focus:outline-none w-auto max-w-[150px] mr-1 p-0 text-sm"
-                              style={{ color: brandColors.primary }}
-                              placeholder="New skill"
-                              aria-label={`Edit skill ${index + 1}`}
-                            />
-                            <button 
-                              onClick={() => removeSkill(index)}
-                              className="ml-1 text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              aria-label={`Remove skill ${skill || 'New skill'}`}
-                            >
-                              <X size={14} />
-                            </button>
-                          </>
-                        ) : (
-                          skill
-                        )}
-                      </div>
-                    ))}
-                    
-                    {isEditing && (
-                      <button
-                        onClick={addSkill}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed hover:bg-gray-50 transition-colors"
-                        style={{
-                          borderColor: brandColors.accent,
-                          color: brandColors.accent
-                        }}
-                         aria-label="Add a new skill"
-                      >
-                        + Add Skill
-                      </button>
-                    )}
-                  </div>
-                </motion.div> */}
-                
-                {/* Security and Settings link cards */}
-                {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <motion.button 
-                    className="bg-white rounded-lg shadow p-4 flex items-center text-left hover:shadow-md transition-shadow w-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.3 }}
-                    onClick={() => setActiveTab("security")}
-                    aria-label="Go to Security Settings"
-                  >
-                    <div className="p-3 rounded-lg mr-3 flex-shrink-0" style={{ backgroundColor: brandColors.primary + '15' }}>
-                      <Lock size={20} style={{ color: brandColors.primary }} />
-                    </div>
-                    <div>
-                      <h3 className="font-medium" style={{ color: brandColors.primary }}>Security</h3>
-                      <p className="text-xs text-gray-500">Password & 2FA</p>
-                    </div>
-                  </motion.button>
-                  
-                  <motion.button 
-                    className="bg-white rounded-lg shadow p-4 flex items-center text-left hover:shadow-md transition-shadow w-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.4 }}
-                    onClick={() => setActiveTab("preferences")}
-                    aria-label="Go to Preferences"
-                  >
-                    <div className="p-3 rounded-lg mr-3 flex-shrink-0" style={{ backgroundColor: brandColors.primary + '15' }}>
-                      <Settings size={20} style={{ color: brandColors.primary }} />
-                    </div>
-                    <div>
-                      <h3 className="font-medium" style={{ color: brandColors.primary }}>Preferences</h3>
-                      <p className="text-xs text-gray-500">App & Learning</p>
-                    </div>
-                  </motion.button>
-                </div> */}
-              </div>
-              
-              {/* Right column - Stats, achievements, activities */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Stats cards */}
-                {/* <motion.div 
-                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  {[
-                      { label: "Programs", value: profile.stats.programsCompleted, color: brandColors.primary },
-                      { label: "Assessments", value: profile.stats.assessmentsTaken, color: brandColors.primary },
-                      { label: "Avg. Score", value: `${profile.stats.averageScore}%`, color: brandColors.primary },
-                      { label: "Hours", value: profile.stats.hoursSpent, color: brandColors.primary },
-                      { label: "Streak", value: `${profile.stats.streak} days`, color: brandColors.success },
-                  ].map(stat => (
-                      <div key={stat.label} className="bg-white rounded-lg shadow p-4 text-center hover:shadow-md transition-shadow">
-                        <p className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider">{stat.label}</p>
-                        <p className="text-xl sm:text-2xl font-bold mt-1" style={{ color: stat.color }}>{stat.value}</p>
-                      </div>
-                  ))}
-                </motion.div> */}
-                
-                {/* Achievements */}
-                <motion.div 
-                  className="bg-white rounded-lg shadow p-5"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                >
-                  <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Achievements</h3>
-                  {profile.achievements && profile.achievements.length > 0 ? (
-                    <div className="space-y-4">
-                      {profile.achievements.map((achievement) => {
-                        const AchievementIcon = getAchievementIcon(achievement.icon)
-                        return (
-                          <div key={achievement.id} className="flex items-start sm:items-center space-x-4">
-                            <div 
-                              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: brandColors.accent + '20' }}
-                            >
-                              <AchievementIcon size={24} style={{ color: brandColors.accent }} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm sm:text-base" style={{ color: brandColors.primary }}>{achievement.title}</h4>
-                              <p className="text-xs sm:text-sm text-gray-600">{achievement.description}</p>
-                            </div>
-                            <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap pt-1 sm:pt-0">{achievement.date}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                     <p className="text-sm text-gray-500">No achievements earned yet.</p>
-                  )}
-                </motion.div>
-                
-                {/* Recent Activity */}
-                <motion.div 
-                  className="bg-white rounded-lg shadow p-5"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                >
-                  <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Recent Activity</h3>
-                  {profile.recentActivities && profile.recentActivities.length > 0 ? (
-                    <div className="space-y-3">
-                      {profile.recentActivities.slice(0, 5).map((activity) => { // Show limited activities
-                        const ActivityIcon = getActivityIcon(activity.type)
-                        return (
-                          <div key={activity.id} className="flex items-center py-2 border-b border-gray-100 last:border-b-0">
-                            <div 
-                              className="w-10 h-10 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
-                              style={{ backgroundColor: brandColors.accent + '15' }}
-                            >
-                              <ActivityIcon size={18} style={{ color: brandColors.accent }} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-800 truncate">{activity.title}</p>
-                              <p className="text-xs text-gray-500">{activity.date}</p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    ) : (
-                       <p className="text-sm text-gray-500">No recent activity.</p>
-                    )}
-                </motion.div>
-                
-              </div>
-            </motion.div>
-          )}
-          
-          {/* Security Tab */}
-          {activeTab === "security" && (
-            <motion.div 
-              key="security"
-              className="bg-white rounded-lg shadow p-6 lg:p-8"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <h2 className="text-xl font-bold mb-6" style={{ color: brandColors.primary }}>Account Security</h2>
-              <p className="text-gray-600 mb-8 text-sm">Manage your password, two-factor authentication, and account deletion.</p>
-              
-              <div className="space-y-8">
-                {/* Change Password Section */}
-                <section>
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2" style={{ color: brandColors.primary, borderColor: brandColors.gray }}>Change Password</h3>
-                  <form className="space-y-4" onSubmit={(e) => e.preventDefault()}> {/* Prevent default form submission */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="current-password">Current Password</label>
-                      <input 
-                        type="password" 
-                        id="current-password"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Enter your current password"
-                        autoComplete="current-password"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-password">New Password</label>
-                      <input 
-                        type="password" 
-                        id="new-password"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Enter new password (min. 8 characters)"
-                        autoComplete="new-password"
-                        minLength={8} // Basic validation hint
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirm-password">Confirm New Password</label>
-                      <input 
-                        type="password" 
-                        id="confirm-password"
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Confirm new password"
-                        autoComplete="new-password"
-                      />
-                       {/* Add password confirmation logic here if needed */}
-                    </div>
-                    <div className="pt-2">
-                      <button 
-                        type="submit"
-                        className="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors"
-                        style={{ backgroundColor: brandColors.primary }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = brandColors.primaryLight}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = brandColors.primary}
-                      >
-                        Update Password
-                      </button>
-                    </div>
-                  </form>
-                </section>
-                
-                
-                {/* Danger Zone Section */}
-                <section className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-3" style={{ color: brandColors.error }}>Danger Zone</h3>
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <h4 className="font-medium text-red-800">Delete Account</h4>
-                    <p className="text-sm text-red-700 mt-1 mb-4">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                    <button 
-                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-                      // Add onClick handler with confirmation dialog
-                      onClick={() => { if(window.confirm('Are you absolutely sure you want to delete your account? This is irreversible.')) { console.log("Account deletion initiated...") } }}
-                    >
-                      Delete My Account
-                    </button>
-                  </div>
-                </section>
-              </div>
-            </motion.div>  
-          )}
-          
-          {/* User Details Tab */}
-          {activeTab === "userDetails" && (
-            <motion.div 
-              key="userDetails"
-              className="bg-white rounded-xl shadow-lg p-8 max-w-5xl mx-auto"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-2" style={{ color: brandColors.primary }}>User Details</h2>
-                <p className="text-gray-600">Manage your personal information and preferences</p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Personal Information Card */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                      <User className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Personal Information</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Username</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.userName || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("userName")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit username"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">First Name</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.firstName || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("firstName")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit first name"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Last Name</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.lastName || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("lastName")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit last name"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Email</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.email || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("email")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit email"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Gender</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.gender || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("gender")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit gender"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Mobile</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.mobileNumber || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("mobileNumber")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit mobile number"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Country</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.country || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("country")}
-                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit country"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Education Information Card */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                      <GraduationCap className="w-5 h-5 text-green-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Education</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Level</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.educationalLevel || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("educationalLevel")}
-                          className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                          title="Edit educational level"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">School</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.School || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("School")}
-                          className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                          title="Edit school"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Grade</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-900 font-semibold">{userDetails.grade || "Not set"}</span>
-                        <button 
-                          onClick={() => openEditModal("grade")}
-                          className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
-                          title="Edit grade"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interest & Purpose Card */}
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                      <Target className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Interest & Purpose</h3>
-                  </div>
-                  
-                  <div className="p-4 bg-white rounded-lg shadow-sm">
-                    <div className="flex justify-between items-start mb-3">
-                      <h4 className="text-sm font-medium text-gray-600">Purpose of Registration</h4>
-                      <button 
-                        onClick={() => openEditModal("purposeOfRegistration")}
-                        className="p-1 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded transition-colors"
-                        title="Edit purpose of registration"
-                      >
-                        <Edit className="w-3 h-3" />
-                      </button>
-                    </div>
-                    {userDetails.purposeOfRegistration && userDetails.purposeOfRegistration.length > 0 ? (
-                      <ul className="space-y-2">
-                        {userDetails.purposeOfRegistration.map((item, i) => (
-                          <li key={i} className="flex items-center">
-                            <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
-                            <span className="text-gray-700">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-gray-500 italic">No purpose of registration specified.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Security Card */}
-                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
-                  <div className="flex items-center mb-4">
-                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
-                      <Lock className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800">Security</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                      <span className="text-gray-600 font-medium">Password</span>
-                      <span className="text-gray-900 font-semibold">••••••••</span>
-                    </div>
-                    
-                    <button 
-                      onClick={() => openEditModal("password")}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <Key className="w-4 h-4 mr-2" />
-                      Change Password
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-
-            </motion.div>
-          )}
-
-          {/* Preferences Tab */}
-          {activeTab === "preferences" && (
-            <motion.div 
-              key="preferences"
-              className="bg-white rounded-lg shadow p-6 lg:p-8 max-w-3xl mx-auto"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <h2 className="text-xl font-bold mb-6" style={{ color: brandColors.primary }}>Preferences</h2>
-              <p className="text-gray-600 mb-8 text-sm">Customize your Gifted experience, including appearance, learning style, and accessibility options.</p>
-              
-              {/* Form for preferences */}
-              <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
-                {/* App Settings Section */}
-                <section>
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2" style={{ color: brandColors.primary, borderColor: brandColors.gray }}>App Settings</h3>
-                  <div className="space-y-5">
-                    {/* Dark Mode Toggle */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label htmlFor="darkModeToggle" className="font-medium text-gray-800 cursor-pointer">Dark Mode</label>
-                        <p className="text-sm text-gray-500">Switch between light and dark themes.</p>
-                      </div>
-                      <label htmlFor="darkModeToggle" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="darkModeToggle" className="sr-only peer" />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-                     
-                        ></div>
-                      </label>
-                    </div>
-                    {/* Add other toggles (Compact View, Auto-play Videos) similarly */}
-                  </div>
-                </section>
-                
-                 {/* Learning Preferences Section */}
-                <section className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Learning Preferences</h3>
-                  <div className="space-y-6">
-                    {/* Learning Style Dropdown */}
-                    <div>
-                      <label htmlFor="learningStyle" className="block text-sm font-medium text-gray-700 mb-1">Preferred Learning Style</label>
-                      <select id="learningStyle" className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-blue-500 focus:border-blue-500">
-                        <option>Visual</option>
-                        <option>Auditory</option>
-                        <option>Kinesthetic</option>
-                        <option>Reading/Writing</option>
-                        <option selected>Multimodal (Default)</option> {/* Example selected */}
-                      </select>
-                    </div>
-                    {/* Add Difficulty Level, Focus Areas, Daily Goal similarly */}
-                    <div>
-                        <label htmlFor="dailyGoal" className="block text-sm font-medium text-gray-700 mb-1">Daily Learning Goal</label>
-                        <div className="flex space-x-2 items-center">
-                        <input 
-                            type="number" 
-                            id="dailyGoalValue"
-                            className="w-20 p-2 border border-gray-300 rounded-md" 
-                            defaultValue="30" min="5" step="5"
-                        />
-                        <select id="dailyGoalUnit" className="p-2 border border-gray-300 rounded-md bg-white">
-                            <option>minutes</option>
-                            <option>modules</option>
-                            <option>lessons</option>
-                        </select>
-                        </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Language & Accessibility Section */}
-                <section className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Language & Accessibility</h3>
-                  <div className="space-y-6">
-                    {/* Language Dropdown */}
-                     <div>
-                        <label htmlFor="languageSelect" className="block text-sm font-medium text-gray-700 mb-1">Interface Language</label>
-                        <select id="languageSelect" className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-blue-500 focus:border-blue-500">
-                            <option>English (US)</option>
-                            <option>English (UK)</option>
-                            {/* Add other languages */}
-                        </select>
-                    </div>
-                    {/* Add Text Size, High Contrast Mode similarly */}
-                     <div className="flex items-center justify-between">
-                      <div>
-                        <label htmlFor="highContrastToggle" className="font-medium text-gray-800 cursor-pointer">High Contrast Mode</label>
-                        <p className="text-sm text-gray-500">Increase text contrast for better readability.</p>
-                      </div>
-                      <label htmlFor="highContrastToggle" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="highContrastToggle" className="sr-only peer" />
-                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                </section>
-                
-                {/* Save Button */}
-                <div className="flex justify-end border-t border-gray-200 pt-6">
-                  <button 
-                    type="submit"
-                    className="px-6 py-2 rounded-md text-sm font-medium text-white transition-colors"
-                    style={{ backgroundColor: brandColors.primary }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = brandColors.primaryLight}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = brandColors.primary}
-                  >
-                    Save Preferences
+                    <Camera size={16} className="text-gray-600" />
                   </button>
+                  <input type="file" accept="image/*" ref={coverInputRef} className="hidden" onChange={handleCoverImageChange} />
                 </div>
-              </form>
-            </motion.div>
-          )}
-          
-          {/* Notifications Tab */}
-          {activeTab === "notifications" && (
-             <motion.div 
-              key="notifications"
-              className="bg-white rounded-lg shadow p-6 lg:p-8 max-w-3xl mx-auto"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-               <h2 className="text-xl font-bold mb-6" style={{ color: brandColors.primary }}>Notification Settings</h2>
-              <p className="text-gray-600 mb-8 text-sm">Choose how and when you want to be notified about updates, progress, and community activity.</p>
 
-              <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
-                {/* Email Notifications Section */}
-                <section>
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2" style={{ color: brandColors.primary, borderColor: brandColors.gray }}>Email Notifications</h3>
-                  <p className="text-sm text-gray-500 mb-4">Receive important updates directly in your inbox ({profile.email}).</p>
-                  <div className="space-y-5">
-                    {/* Example Toggle: Program Updates */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label htmlFor="emailProgramUpdates" className="font-medium text-gray-800 cursor-pointer">Program Updates</label>
-                        <p className="text-sm text-gray-500">New content, program changes, and recommendations.</p>
-                      </div>
-                      <label htmlFor="emailProgramUpdates" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="emailProgramUpdates" className="sr-only peer" defaultChecked />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                      </label>
+                {/* Avatar + info */}
+                <div className="px-5 pb-5 relative">
+                  <div className="relative -mt-12 mb-3 w-24 h-24 mx-auto">
+                    <div
+                      className="w-24 h-24 rounded-full border-4 border-white flex items-center justify-center overflow-hidden"
+                      style={{ backgroundColor: profileImage ? "#E5E7EB" : brandColors.accent }}
+                    >
+                      {profileImageLoading ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
+                      ) : profileImage ? (
+                        <img src={profileImage} alt="Avatar" className="w-full h-full object-cover" onError={() => setProfileImage(null)} />
+                      ) : (
+                        <span className="text-2xl font-bold text-white">{getInitials(profile.name)}</span>
+                      )}
                     </div>
-                    {/* Add other email toggles similarly */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label htmlFor="emailNewsletter" className="font-medium text-gray-800 cursor-pointer">Newsletter</label>
-                        <p className="text-sm text-gray-500">Weekly learning tips, news, and platform updates.</p>
-                      </div>
-                      <label htmlFor="emailNewsletter" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="emailNewsletter" className="sr-only peer" />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Push Notifications Section */}
-                <section className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Push Notifications</h3>
-                   <p className="text-sm text-gray-500 mb-4">Get timely alerts on your device (requires app installation or browser permission).</p>
-                  <div className="space-y-5">
-                     {/* Example Toggle: Daily Reminders */}
-                     <div className="flex items-center justify-between">
-                      <div>
-                        <label htmlFor="pushDailyReminders" className="font-medium text-gray-800 cursor-pointer">Daily Reminders</label>
-                        <p className="text-sm text-gray-500">Gentle nudge to meet your learning goals.</p>
-                      </div>
-                      <label htmlFor="pushDailyReminders" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="pushDailyReminders" className="sr-only peer" defaultChecked/>
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                    {/* Add other push toggles */}
-                  </div>
-                </section>
-
-                 {/* Notification Schedule Section */}
-                 <section className="border-t border-gray-200 pt-6">
-                    <h3 className="text-lg font-medium mb-4" style={{ color: brandColors.primary }}>Notification Schedule</h3>
-                     <div className="space-y-5">
-                        {/* Quiet Hours Setting */}
-                         <div>
-                            <p className="font-medium text-gray-800 mb-2">Quiet Hours</p>
-                            <p className="text-sm text-gray-500 mb-3">Pause notifications during specific times to avoid interruptions.</p>
-                            <div className="flex items-center space-x-3">
-                                <label htmlFor="quietStart" className="sr-only">Quiet hours start time</label>
-                                <select id="quietStart" className="p-2 border border-gray-300 rounded-md bg-white text-sm">
-                                    <option>10:00 PM</option>
-                                    <option>11:00 PM</option>
-                                    {/* Add more times */}
-                                </select>
-                                <span className="text-gray-500 text-sm">to</span>
-                                <label htmlFor="quietEnd" className="sr-only">Quiet hours end time</label>
-                                <select id="quietEnd" className="p-2 border border-gray-300 rounded-md bg-white text-sm">
-                                    <option>7:00 AM</option>
-                                    <option>8:00 AM</option>
-                                    {/* Add more times */}
-                                </select>
-                                {/* Add a toggle to enable/disable quiet hours */}
-                            </div>
-                        </div>
-                         {/* Weekend Mode Toggle */}
-                         <div className="flex items-center justify-between">
-                            <div>
-                                <label htmlFor="weekendMode" className="font-medium text-gray-800 cursor-pointer">Weekend Mode</label>
-                                <p className="text-sm text-gray-500">Reduce notification frequency on Saturdays and Sundays.</p>
-                            </div>
-                            <label htmlFor="weekendMode" className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="weekendMode" className="sr-only peer" defaultChecked />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
-                    </div>
-                 </section>
-                
-                {/* Save Button */}
-                <div className="flex justify-end border-t border-gray-200 pt-6">
-                  <button 
-                    type="submit"
-                    className="px-6 py-2 rounded-md text-sm font-medium text-white transition-colors"
-                     style={{ backgroundColor: brandColors.primary }}
-                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = brandColors.primaryLight}
-                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = brandColors.primary}
-                  >
-                    Save Notification Settings
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-
-          {/* Edit Modal */}
-          {editingField && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-              <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-                <h2 className="text-xl font-bold mb-4 capitalize">Edit {editingField}</h2>
-                {editingField === "password" ? (
-                  <>
-                    {["oldPassword", "newPassword", "confirmPassword"].map((field) => (
-                      <input
-                        key={field}
-                        type={passwordVisible ? "text" : "password"}
-                        name={field}
-                        placeholder={field.replace(/([A-Z])/g, " $1")}
-                        value={formData[field] || ""}
-                        onChange={handleChange}
-                        className="w-full p-2 border rounded mb-3"
-                      />
-                    ))}
                     <button
-                      onClick={() => setPasswordVisible(!passwordVisible)}
-                      className="text-xs text-blue-500 underline mb-4"
+                      onClick={() => profileInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow hover:bg-gray-100 transition-colors border border-gray-200"
+                      title="Change profile picture"
                     >
-                      {passwordVisible ? "Hide Passwords" : "Show Passwords"}
+                      <Camera size={12} className="text-gray-600" />
                     </button>
-                  </>
-                ) : (
-                  <input
-                    name={editingField}
-                    value={formData[editingField] || ""}
-                    onChange={handleChange}
-                    className="w-full p-2 border rounded"
-                  />
-                )}
-                <div className="flex justify-end gap-4 mt-6">
-                  <button onClick={() => setEditingField(null)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
-                    Cancel
-                  </button>
-                  <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Save
-                  </button>
+                    <input type="file" accept="image/*" ref={profileInputRef} className="hidden" onChange={handleProfileImageChange} />
+                  </div>
+
+                  <div className="text-center mb-4">
+                    <h2 className="text-lg font-bold" style={{ color: brandColors.primary }}>{profile.name || "—"}</h2>
+                    <p className="text-sm" style={{ color: brandColors.secondary }}>{profile.role}</p>
+                  </div>
+
+                  <div className="space-y-2.5 text-sm text-gray-600">
+                    {profile.email && (
+                      <div className="flex items-center gap-2"><Mail size={14} className="text-gray-400 shrink-0" /><span className="truncate">{profile.email}</span></div>
+                    )}
+                    {profile.phone && (
+                      <div className="flex items-center gap-2"><Phone size={14} className="text-gray-400 shrink-0" /><span>{profile.phone}</span></div>
+                    )}
+                    {profile.location && (
+                      <div className="flex items-center gap-2"><MapPin size={14} className="text-gray-400 shrink-0" /><span>{profile.location}</span></div>
+                    )}
+                    {profile.joined && (
+                      <div className="flex items-center gap-2"><Calendar size={14} className="text-gray-400 shrink-0" /><span>Member since {profile.joined}</span></div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* Footer */}
-          <footer className="mt-12 text-center text-sm text-gray-500 border-t border-gray-200 pt-6">
-            <p>© {new Date().getFullYear()} Gifted Learning Platform. All rights reserved.</p>
-          </footer>
-        </div>
-      </main>
+
+            {/* Right column */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Achievements */}
+              <div className="bg-white rounded-2xl shadow p-5">
+                <h3 className="text-base font-semibold mb-4" style={{ color: brandColors.primary }}>Achievements</h3>
+                <p className="text-sm text-gray-400">No achievements earned yet.</p>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="bg-white rounded-2xl shadow p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold" style={{ color: brandColors.primary }}>Recent Activity</h3>
+                  <button
+                    onClick={() => navigate("/history")}
+                    className="flex items-center gap-1 text-xs font-medium transition-colors"
+                    style={{ color: brandColors.secondary }}
+                  >
+                    Full history <ArrowRight size={12} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Your assessment results, competition registrations, and course progress are tracked in{" "}
+                  <button onClick={() => navigate("/history")} className="underline font-medium" style={{ color: brandColors.secondary }}>
+                    My History
+                  </button>.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── User Details Tab ──────────────────────────────────────────────── */}
+        {activeTab === "userDetails" && (
+          <motion.div
+            key="userDetails"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            {/* Personal Information */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">Personal Information</h3>
+              </div>
+              <div className="space-y-3">
+                <DetailRow label="Username"   value={userDetails.userName}      fieldName="userName"      onEdit={openEditModal} />
+                <DetailRow label="First Name" value={userDetails.firstName}     fieldName="firstName"     onEdit={openEditModal} />
+                <DetailRow label="Last Name"  value={userDetails.lastName}      fieldName="lastName"      onEdit={openEditModal} />
+                <DetailRow label="Email"      value={userDetails.email}         fieldName="email"         onEdit={openEditModal} />
+                <DetailRow label="Gender"     value={userDetails.gender}        fieldName="gender"        onEdit={openEditModal} />
+                <DetailRow label="Mobile"     value={userDetails.mobileNumber}  fieldName="mobileNumber"  onEdit={openEditModal} />
+                <DetailRow label="Country"    value={userDetails.country}       fieldName="country"       onEdit={openEditModal} />
+              </div>
+            </div>
+
+            {/* Education */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">Education</h3>
+              </div>
+              <div className="space-y-3">
+                <DetailRow label="Level"  value={userDetails.educationalLevel} fieldName="educationalLevel" onEdit={openEditModal} />
+                <DetailRow label="School" value={userDetails.School}           fieldName="School"           onEdit={openEditModal} />
+                <DetailRow label="Grade"  value={userDetails.grade}            fieldName="grade"            onEdit={openEditModal} />
+              </div>
+            </div>
+
+            {/* Interest & Purpose */}
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-6 border border-purple-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Target className="w-5 h-5 text-purple-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">Interest & Purpose</h3>
+              </div>
+              <div className="p-4 bg-white rounded-xl shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="text-sm font-medium text-gray-600">Purpose of Registration</h4>
+                  <button onClick={() => openEditModal("purposeOfRegistration")} className="p-1 rounded hover:bg-gray-100 transition-colors">
+                    <Edit className="w-3 h-3 text-gray-400" />
+                  </button>
+                </div>
+                {userDetails.purposeOfRegistration?.length > 0 ? (
+                  <ul className="space-y-2">
+                    {userDetails.purposeOfRegistration.map((item, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                        <div className="w-2 h-2 bg-purple-400 rounded-full shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Not specified.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Change password shortcut */}
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border border-orange-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-orange-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">Security</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm">
+                  <span className="text-gray-600 font-medium">Password</span>
+                  <span className="text-gray-900 font-semibold tracking-widest">••••••••</span>
+                </div>
+                <button
+                  onClick={() => setActiveTab("security")}
+                  className="w-full py-2 px-4 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "#F97316" }}
+                >
+                  <Key className="w-4 h-4" /> Change Password
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Security Tab ──────────────────────────────────────────────────── */}
+        {activeTab === "security" && (
+          <motion.div
+            key="security"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-white rounded-2xl shadow p-6 lg:p-8 max-w-xl"
+          >
+            <h2 className="text-xl font-bold mb-1" style={{ color: brandColors.primary }}>Account Security</h2>
+            <p className="text-sm text-gray-500 mb-8">Update your password. You will need to log in again after changing it.</p>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                <input
+                  type="password"
+                  value={pwForm.current}
+                  onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
+                  className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: brandColors.border }}
+                  placeholder="Enter your current password"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                <input
+                  type="password"
+                  value={pwForm.next}
+                  onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
+                  className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: brandColors.border }}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+                <input
+                  type="password"
+                  value={pwForm.confirm}
+                  onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
+                  className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: brandColors.border }}
+                  placeholder="Repeat new password"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {pwError && (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">
+                  <AlertCircle size={14} /> {pwError}
+                </div>
+              )}
+              {pwSuccess && (
+                <div className="flex items-center gap-2 text-sm bg-green-50 rounded-xl px-3 py-2" style={{ color: brandColors.success }}>
+                  <CheckCircle size={14} /> {pwSuccess}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={pwSaving}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: brandColors.primary }}
+              >
+                {pwSaving ? "Updating..." : "Update password"}
+              </button>
+            </form>
+
+            <div className="mt-10 pt-6 border-t" style={{ borderColor: brandColors.border }}>
+              <h3 className="text-base font-semibold text-red-600 mb-3">Danger Zone</h3>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <h4 className="font-medium text-red-800 text-sm">Delete Account</h4>
+                <p className="text-xs text-red-700 mt-1 mb-3">Permanently delete your account and all associated data. This cannot be undone.</p>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Are you absolutely sure? This action is permanent and cannot be reversed.")) {
+                      console.log("Account deletion requested — needs backend implementation.")
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete my account
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Edit Field Modal ──────────────────────────────────────────────── */}
+        {editingField && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+              <h2 className="text-lg font-bold mb-4 capitalize" style={{ color: brandColors.primary }}>
+                Edit {editingField.replace(/([A-Z])/g, " $1").toLowerCase()}
+              </h2>
+
+              {editingField === "password" ? (
+                <div className="space-y-3">
+                  {["oldPassword", "newPassword", "confirmPassword"].map((field) => (
+                    <input
+                      key={field}
+                      type={passwordVisible ? "text" : "password"}
+                      name={field}
+                      placeholder={field.replace(/([A-Z])/g, " $1").toLowerCase()}
+                      value={formData[field] || ""}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2.5 border rounded-xl text-sm"
+                      style={{ borderColor: brandColors.border }}
+                    />
+                  ))}
+                  <button onClick={() => setPasswordVisible((v) => !v)} className="text-xs underline" style={{ color: brandColors.secondary }}>
+                    {passwordVisible ? "Hide" : "Show"} passwords
+                  </button>
+                </div>
+              ) : (
+                <input
+                  name={editingField}
+                  value={formData[editingField] || ""}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border rounded-xl text-sm"
+                  style={{ borderColor: brandColors.border }}
+                  autoFocus
+                />
+              )}
+
+              {saveError && <p className="mt-2 text-xs text-red-600">{saveError}</p>}
+              {saveSuccess && <p className="mt-2 text-xs" style={{ color: brandColors.success }}>{saveSuccess}</p>}
+
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ backgroundColor: brandColors.primary }}
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setEditingField(null)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors hover:bg-gray-50"
+                  style={{ borderColor: brandColors.border, color: brandColors.primary }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <footer className="mt-12 text-center text-xs text-gray-400 border-t pt-6" style={{ borderColor: brandColors.border }}>
+          © {new Date().getFullYear()} Gifted Learning Platform. All rights reserved.
+        </footer>
+      </div>
     </div>
   )
 }

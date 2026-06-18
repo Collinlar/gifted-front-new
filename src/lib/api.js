@@ -46,6 +46,9 @@ export async function updateUserDetails(userId, updates) {
   if ('schoolName'             in updates) dbUpdates.school_name             = updates.schoolName
   if ('dateOfBirth'            in updates) dbUpdates.date_of_birth           = updates.dateOfBirth
   if ('profilePicture'         in updates) dbUpdates.profile_picture         = updates.profilePicture
+  if ('educationalLevel'       in updates) dbUpdates.educational_level       = updates.educationalLevel
+  if ('School'                 in updates) dbUpdates.school                  = updates.School
+  if ('userName'               in updates) dbUpdates.user_name               = updates.userName
 
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -382,6 +385,33 @@ export async function getQuizDetails(userId) {
   return { success: true, quizDetails }
 }
 
+export async function getExamAttempts(userId, quizId) {
+  const legacyId = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_user_id') : null
+  const mongoId  = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_mongo_id') : null
+  const ids = [...new Set([userId, legacyId, mongoId].filter(Boolean))]
+  if (!ids.length) return { success: true, attempts: [] }
+
+  const { data, error } = await supabaseAdmin
+    .from('assessments')
+    .select('id, created_at, details')
+    .in('user_id', ids)
+    .filter('details->>quizId', 'eq', String(quizId))
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  const attempts = (data || []).map((row) => ({
+    id: row.id,
+    date: row.details?.date || new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    score: row.details?.score ?? null,
+    totalQuestions: row.details?.totalQuestions ?? null,
+    review: row.details?.review || null, // per-question data if stored
+    createdAt: row.created_at,
+  }))
+
+  return { success: true, attempts }
+}
+
 // ─── Flashcards ────────────────────────────────────────────────────────────────
 
 export async function getFlashCards(courseId) {
@@ -673,4 +703,105 @@ export async function getEnrollments(userId) {
 
   if (error) throw error
   return { success: true, enrollments: data }
+}
+
+// ─── History & Registration ────────────────────────────────────────────────────
+
+export async function getUserCompetitionRegistrations(userId) {
+  const { data, error } = await supabaseAdmin
+    .from('program_registrations')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return { success: true, registrations: data || [] }
+}
+
+export async function registerForCompetition(userId, { competitionId, name, year, grade }) {
+  // Check for duplicate first
+  const { data: existing } = await supabaseAdmin
+    .from('program_registrations')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('program', name)
+    .maybeSingle()
+
+  if (existing) return { success: true, registration: existing, alreadyRegistered: true }
+
+  const { data, error } = await supabaseAdmin
+    .from('program_registrations')
+    .insert({
+      user_id: userId,
+      competition_id: competitionId,
+      program: name,
+      year: year || null,
+      grade: grade || null,
+      status: 'registered',
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return { success: true, registration: data, alreadyRegistered: false }
+}
+
+export async function getUserHistory(userId) {
+  const legacyId = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_user_id') : null
+  const mongoId  = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_mongo_id') : null
+  const assessmentIds = [...new Set([userId, legacyId, mongoId].filter(Boolean))]
+
+  const [regsRes, campRegsRes, attemptsRes, progressRes] = await Promise.all([
+    supabaseAdmin
+      .from('program_registrations')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+
+    supabaseAdmin
+      .from('camp_registrations')
+      .select('*, camps(id, name, start_date, end_date, location, is_virtual, image)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+
+    assessmentIds.length
+      ? supabaseAdmin
+          .from('assessments')
+          .select('*')
+          .in('user_id', assessmentIds)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+
+    supabaseAdmin
+      .from('course_progress')
+      .select('*, courses(id, title, thumbnail)')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false }),
+  ])
+
+  // Flatten assessment attempts and group by exam title/quizId
+  const rawAttempts = (attemptsRes.data || [])
+    .map(row => ({ ...(row.details || {}), _rowId: row.id, createdAt: row.created_at }))
+    .filter(a => a.title)
+
+  const examMap = {}
+  for (const attempt of rawAttempts) {
+    const key = attempt.quizId || attempt.title
+    if (!examMap[key]) examMap[key] = { quizId: attempt.quizId, title: attempt.title, attempts: [] }
+    examMap[key].attempts.push({
+      score: attempt.score ?? 0,
+      totalQuestions: attempt.totalQuestions ?? 0,
+      date: attempt.date || attempt.createdAt,
+      createdAt: attempt.createdAt,
+    })
+  }
+  const assessmentHistory = Object.values(examMap)
+
+  return {
+    success: true,
+    competitions: regsRes.data || [],
+    camps: campRegsRes.data || [],
+    assessmentHistory,
+    courseProgress: progressRes.data || [],
+  }
 }

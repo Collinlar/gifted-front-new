@@ -128,7 +128,7 @@ const OnboardingWizard = ({ isVisible, onClose, onComplete, navigate }) => {
 };
 
 // One column of the "What's Next" cross-track feed on the dashboard.
-const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, actionLabel, navigate }) => (
+const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, tab, navigate }) => (
   <div className="bg-white rounded-xl shadow-md p-5">
     <h3 className="flex items-center gap-2 font-semibold text-[#003366] mb-4">
       {icon}
@@ -141,7 +141,7 @@ const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, actionLabel, n
         {items.map((item) => (
           <button
             key={item.id}
-            onClick={() => navigate(`/track/${item.trackSlug}`)}
+            onClick={() => navigate(`/track/${item.trackSlug}`, { state: { tab } })}
             className="w-full text-left rounded-lg border border-gray-100 p-3 hover:border-[#336699] hover:shadow-sm transition-all"
           >
             <div className="flex items-center gap-1.5 mb-1">
@@ -541,6 +541,7 @@ const OverviewPage = () => {
                 items={crossTrackFeed.newAssessments}
                 emptyLabel="No new assessments right now."
                 renderMeta={(item) => `${item.number_of_questions || item.totalQuestions || "?"} questions`}
+                tab="exams"
                 navigate={navigate}
               />
               <FeedColumn
@@ -549,6 +550,7 @@ const OverviewPage = () => {
                 items={crossTrackFeed.upcomingCompetitions}
                 emptyLabel="No upcoming competitions right now."
                 renderMeta={(item) => item.start_date}
+                tab="competitions"
                 navigate={navigate}
               />
               <FeedColumn
@@ -557,6 +559,7 @@ const OverviewPage = () => {
                 items={crossTrackFeed.upcomingCamps}
                 emptyLabel="No upcoming camps right now."
                 renderMeta={(item) => item.is_virtual ? "Virtual" : (item.location || item.start_date)}
+                tab="camps"
                 navigate={navigate}
               />
             </div>

@@ -57,6 +57,7 @@ import ClassicFlashcards from './Pages/ClassicFlashcards';
 import TimedChallenge from './Pages/TimedChallenge';
 import AIPoweredStudy from './Pages/AIPoweredStudy';
 import Marketplace from './Pages/MarketPlace';
+import History from './Pages/History';
 import { ensureAccessibilityBar } from './Components/AccessibilityBar';
 // import { LeaderboardPage } from "./Pages/Leaderboard";
 // import ContestJoinPage from "./Pages/JoinContest";
@@ -134,13 +135,14 @@ function App() {
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/user-details" || location.pathname=="/tracks" || location.pathname.startsWith("/track/"))&&<Sidebar className="overflow-y-hidden" />}
+			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile")&&<Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				<Route index element={<LandingPages/>}/>
 				
 				<Route path='/overview' element={<OverviewPage competitions={competitions} />} />
 				<Route path='/tracks' element={<Tracks />} />
+				<Route path='/history' element={<History />} />
 				<Route path='/track/:slug' element={<TrackDetail />} />
 				<Route path='/community' element={<Community />} />
 				<Route path='/learning-management' element={<LearningManagement />} />

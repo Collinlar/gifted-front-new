@@ -9,6 +9,8 @@ export default function CourseDetailsPage() {
   const navigate = useNavigate();
   const courseData = location.state;
   const { title, description, duration } = courseData;
+  const trackSlug = courseData?.trackSlug;
+  const trackName = courseData?.trackName;
 
   const [course, setCourse] = useState([]);
   const [courseProgress, setCourseProgress] = useState([]);
@@ -68,12 +70,21 @@ export default function CourseDetailsPage() {
 
         {/* HEADER */}
         <div className="bg-white p-6 rounded-xl shadow space-y-2">
-          <button
-            onClick={() => navigate(-1)}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            &larr; Back
-          </button>
+          {trackSlug ? (
+            <button
+              onClick={() => navigate(`/track/${trackSlug}`, { state: { tab: "courses" } })}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              &larr; Back to {trackName || "Track"}
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate(-1)}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              &larr; Back
+            </button>
+          )}
           <h1 className="text-3xl font-bold">{title}</h1>
           <p className="text-gray-700">{description}</p>
         </div>
@@ -147,7 +158,7 @@ export default function CourseDetailsPage() {
                         <span className="text-green-600 font-medium text-sm">✓ Completed</span>
                         <button
                           className="border border-blue-500 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-50"
-                          onClick={() => navigate("/course-details", { state: mod })}
+                          onClick={() => navigate("/course-details", { state: { ...mod, trackSlug, trackName } })}
                         >
                           Reopen
                         </button>
@@ -155,7 +166,7 @@ export default function CourseDetailsPage() {
                     ) : (
                       <button
                         className="border border-green-500 text-green-600 px-4 py-1 rounded hover:bg-green-50"
-                        onClick={() => navigate("/course-details", { state: mod })}
+                        onClick={() => navigate("/course-details", { state: { ...mod, trackSlug, trackName } })}
                       >
                         Open
                       </button>

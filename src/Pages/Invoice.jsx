@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { verifyRegistration as verifyReg, getUserDetails, registerProgram } from "../lib/api";
+import { verifyRegistration as verifyReg, getUserDetails, registerProgram, registerForCompetition } from "../lib/api";
 import { jwtDecode } from "jwt-decode";
+import { getTokenUserId } from "../lib/auth";
 import toast, { Toaster } from "react-hot-toast";
 
 // axios.defaults.timeout = 10000; // Prevent infinite hanging requests
@@ -103,6 +104,17 @@ const Invoice = () => {
       if (response.success) {
         toast.success("Registration successful.");
         setShowButton(true);
+        // Sync to the new program_registrations table so TrackDetail
+        // recognises this user as registered for the same competition
+        const supabaseUserId = getTokenUserId()
+        if (supabaseUserId) {
+          registerForCompetition(supabaseUserId, {
+            competitionId: subItem.id || subItem._id || null,
+            name: subItem.name,
+            year: subItem.year,
+            grade: grade,
+          }).catch(() => {}) // non-blocking — old flow still succeeded
+        }
       } else {
         toast.error(response.data.message || "Registration failed.");
         setErrorMessage(response.data.message || "Something went wrong.");

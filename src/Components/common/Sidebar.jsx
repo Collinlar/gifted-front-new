@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Activity, BookOpen, ChevronRight, Cpu, FileText, HelpCircle, Home, Menu, Users,Calendar, LayoutList, Compass } from "lucide-react"
+import { Activity, BookOpen, ChevronRight, Cpu, FileText, HelpCircle, Home, Menu, Users, Calendar, LayoutList, Compass, Clock } from "lucide-react"
 import { jwtDecode } from "jwt-decode"
 import { use } from "react"
 
@@ -30,6 +30,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: "Dashboard", icon: Home, href: "/overview" },
       { name: "My Tracks", icon: Compass, href: "/tracks" },
+      { name: "My History", icon: Clock, href: "/history" },
     ],
   },
   {

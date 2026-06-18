@@ -12,6 +12,8 @@ export default function ReviewCourse() {
   const category = locator.state.category;
   const level = locator.state.level;
   const courseProgress = locator.state.progress;
+  const trackSlug = locator.state?.trackSlug;
+  const trackName = locator.state?.trackName;
 
   const navigate = useNavigate();
   const [courseReview, setCourseReview] = useState([]);
@@ -102,13 +104,23 @@ export default function ReviewCourse() {
           ))}
         </div>
 
-        {/* All Courses Button */}
-        <button
-          onClick={() => navigate("/learning-management")}
-          className="mt-4 px-6 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-full font-medium text-sm transition-all duration-200"
-        >
-          All Courses
-        </button>
+        {/* Navigation back */}
+        <div className="flex gap-3 justify-center mt-4 flex-wrap">
+          {trackSlug && (
+            <button
+              onClick={() => navigate(`/track/${trackSlug}`, { state: { tab: "courses" } })}
+              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full font-medium text-sm transition-all duration-200"
+            >
+              Back to {trackName || "Track"}
+            </button>
+          )}
+          <button
+            onClick={() => navigate("/learning-management")}
+            className="px-6 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-full font-medium text-sm transition-all duration-200"
+          >
+            All Courses
+          </button>
+        </div>
       </div>
 
       {/* Wave SVG footer */}
