@@ -532,6 +532,193 @@ export async function getUserContestAttempts(contestId, userId) {
   return { success: true, attempts: data }
 }
 
+// ─── Practice Mode ─────────────────────────────────────────────────────────────
+
+// Spacing intervals (days) based on mastery score bands
+function spacingDays(masteryScore, correct) {
+  if (!correct) return 1          // wrong: resurface tomorrow
+  if (masteryScore >= 0.9) return 14 // very strong: 2 weeks
+  if (masteryScore >= 0.7) return 7  // solid: 1 week
+  if (masteryScore >= 0.5) return 3  // improving: 3 days
+  return 1                           // weak but got it right: try again soon
+}
+
+// Returns an ordered question array for a practice session.
+// Priority: overdue for review → low mastery → new (never seen).
+// Questions with mastery >= 0.9 AND not yet due are excluded (student has mastered them).
+export async function getPracticeQueue(userId, examId, sessionSize = 12) {
+  // Fetch the exam to get the full question list
+  const { data: exam, error: examErr } = await supabaseAdmin
+    .from('exams')
+    .select('questions')
+    .eq('id', examId)
+    .single()
+  if (examErr) throw examErr
+
+  // Normalize question shape: admin stores { answers, correctAnswer } but practice
+  // page needs { options, correct (index) }. Support both shapes.
+  const normalizeQ = (q) => {
+    if (q.options && q.options.length > 0) return q  // already normalized
+    const opts = q.answers || q.options || []
+    const correctStr = q.correctAnswer ?? q.correct_answer ?? ''
+    const correctIdx = typeof correctStr === 'number'
+      ? correctStr
+      : opts.findIndex(o => String(o) === String(correctStr))
+    return {
+      ...q,
+      options: opts,
+      correct: correctIdx >= 0 ? correctIdx : 0,
+    }
+  }
+
+  const allQuestions = (exam.questions || []).map(normalizeQ)
+
+  // Fetch existing mastery rows for this user + exam
+  const { data: masteryRows, error: mErr } = await supabaseAdmin
+    .from('question_mastery')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('exam_id', examId)
+  if (mErr) throw mErr
+
+  const masteryMap = {}
+  ;(masteryRows || []).forEach(r => { masteryMap[r.question_id] = r })
+
+  const now = new Date()
+
+  // Classify each question
+  const overdue = []
+  const lowMastery = []
+  const newQuestions = []
+
+  allQuestions.forEach(q => {
+    const qId = q.id || q._id || String(q.question)
+    const m = masteryMap[qId]
+    if (!m) {
+      newQuestions.push({ ...q, _qId: qId, _mastery: 0 })
+      return
+    }
+    const isDue = new Date(m.next_review) <= now
+    if (isDue) {
+      overdue.push({ ...q, _qId: qId, _mastery: m.mastery_score })
+    } else if (m.mastery_score < 0.9) {
+      lowMastery.push({ ...q, _qId: qId, _mastery: m.mastery_score })
+    }
+    // mastery >= 0.9 and not due: skip (student has it down)
+  })
+
+  // Sort: overdue by next_review ascending, lowMastery by mastery ascending
+  overdue.sort((a, b) => {
+    const ma = masteryMap[a._qId]
+    const mb = masteryMap[b._qId]
+    return new Date(ma?.next_review) - new Date(mb?.next_review)
+  })
+  lowMastery.sort((a, b) => a._mastery - b._mastery)
+
+  // Build queue: overdue first, then low mastery, then new
+  const queue = [...overdue, ...lowMastery, ...newQuestions].slice(0, sessionSize)
+
+  return { success: true, questions: queue, totalQuestions: allQuestions.length }
+}
+
+// Called after every question answer in practice mode.
+// Updates mastery score and computes next_review using spacing algorithm.
+export async function updateQuestionMastery(userId, examId, questionId, correct) {
+  // Fetch existing row
+  const { data: existing } = await supabaseAdmin
+    .from('question_mastery')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('exam_id', examId)
+    .eq('question_id', questionId)
+    .single()
+
+  const prevAttempts = existing?.attempt_count || 0
+  const prevCorrect  = existing?.correct_count  || 0
+  const newAttempts  = prevAttempts + 1
+  const newCorrect   = prevCorrect + (correct ? 1 : 0)
+  const masteryScore = newCorrect / newAttempts
+
+  const days       = spacingDays(masteryScore, correct)
+  const nextReview = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+
+  const row = {
+    user_id:       userId,
+    exam_id:       examId,
+    question_id:   questionId,
+    attempt_count: newAttempts,
+    correct_count: newCorrect,
+    mastery_score: masteryScore,
+    next_review:   nextReview,
+    last_seen:     new Date().toISOString(),
+  }
+
+  const { error } = await supabaseAdmin
+    .from('question_mastery')
+    .upsert(row, { onConflict: 'user_id,exam_id,question_id' })
+
+  if (error) throw error
+  return { success: true, masteryScore, nextReview }
+}
+
+// Save a completed practice session record
+export async function savePracticeSession(userId, examId, { questionsSeen, correctCount, hintsUsed, durationSecs }) {
+  const sessionScore = questionsSeen > 0 ? correctCount / questionsSeen : 0
+  const { error } = await supabaseAdmin
+    .from('practice_sessions')
+    .insert({
+      user_id:        userId,
+      exam_id:        examId,
+      questions_seen: questionsSeen,
+      correct_count:  correctCount,
+      session_score:  sessionScore,
+      hints_used:     hintsUsed,
+      duration_secs:  durationSecs,
+    })
+  if (error) throw error
+  return { success: true }
+}
+
+// Returns per-question mastery data for a user + exam
+export async function getUserMasteryForExam(userId, examId) {
+  const { data, error } = await supabaseAdmin
+    .from('question_mastery')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('exam_id', examId)
+  if (error) throw error
+  return { success: true, mastery: data || [] }
+}
+
+// Returns 0–100 exam readiness score: average mastery across all questions
+// linked to this exam (either directly or via practice_for).
+export async function getExamReadiness(userId, examId) {
+  const { data: masteryRows, error } = await supabaseAdmin
+    .from('question_mastery')
+    .select('mastery_score')
+    .eq('user_id', userId)
+    .eq('exam_id', examId)
+  if (error) throw error
+
+  if (!masteryRows || masteryRows.length === 0) return { success: true, readiness: 0 }
+
+  const avg = masteryRows.reduce((sum, r) => sum + r.mastery_score, 0) / masteryRows.length
+  return { success: true, readiness: Math.round(avg * 100) }
+}
+
+// Returns recent practice sessions for a user + exam (newest first)
+export async function getPracticeSessions(userId, examId, limit = 10) {
+  const { data, error } = await supabaseAdmin
+    .from('practice_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('exam_id', examId)
+    .order('completed_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return { success: true, sessions: data || [] }
+}
+
 // ─── Analytics ─────────────────────────────────────────────────────────────────
 
 export async function getAllLearningResourceAnalytics(userId) {

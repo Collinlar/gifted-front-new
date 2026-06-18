@@ -31,15 +31,28 @@ const formatDateRange = (start, end) => {
 
 const CONTEST_COLOR = "#E8A020"
 
-const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel, isContest }) => (
+const PRACTICE_COLOR = "#1D9E75"
+const EXAM_COLOR     = "#185FA5"
+
+const MODE_BADGE = {
+  contest:  { bg: CONTEST_COLOR,  label: "Contest",  Icon: Zap },
+  practice: { bg: PRACTICE_COLOR, label: "Practice", Icon: BookOpen },
+  exam:     { bg: EXAM_COLOR,     label: "Exam",     Icon: FileQuestion },
+}
+
+const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel, isContest, isPractice, readiness }) => {
+  const mode = isContest ? 'contest' : isPractice ? 'practice' : 'exam'
+  const badge = MODE_BADGE[mode]
+  const accentColor = isContest ? CONTEST_COLOR : isPractice ? PRACTICE_COLOR : color
+
+  return (
   <div
     className="group rounded-2xl bg-white border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex flex-col"
-    style={{ borderColor: isContest ? CONTEST_COLOR : brandColors.border, opacity: gated ? 0.85 : 1 }}
+    style={{ borderColor: accentColor, opacity: gated ? 0.85 : 1 }}
   >
-    {/* Contest accent stripe */}
-    {isContest && (
-      <div className="h-1 w-full" style={{ backgroundColor: CONTEST_COLOR }} />
-    )}
+    {/* Mode accent stripe */}
+    <div className="h-1 w-full" style={{ backgroundColor: accentColor }} />
+
     {image && (
       <div className="w-full h-40 overflow-hidden bg-gray-100 relative">
         <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
@@ -48,19 +61,17 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
             <Lock size={24} className="text-white" />
           </div>
         )}
-        {isContest && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: CONTEST_COLOR }}>
-            <Zap size={10} /> Contest
-          </div>
-        )}
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: accentColor }}>
+          <badge.Icon size={10} /> {badge.label}
+        </div>
       </div>
     )}
     <div className="p-5 flex flex-col flex-1">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          {isContest && !image && (
-            <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: CONTEST_COLOR }}>
-              <Zap size={9} /> Contest
+          {!image && (
+            <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: accentColor }}>
+              <badge.Icon size={9} /> {badge.label}
             </span>
           )}
           <h3 className="font-semibold line-clamp-2" style={{ color: brandColors.primary }}>{title}</h3>
@@ -80,6 +91,23 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
         </div>
       </div>
       {meta && <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">{meta}</div>}
+
+      {/* Readiness bar for practice cards */}
+      {isPractice && typeof readiness === 'number' && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-gray-500">Readiness</span>
+            <span className="font-semibold" style={{ color: readiness >= 75 ? PRACTICE_COLOR : '#E8A020' }}>{readiness}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${readiness}%`, backgroundColor: readiness >= 75 ? PRACTICE_COLOR : '#E8A020' }}
+            />
+          </div>
+        </div>
+      )}
+
       {priceLabel && (
         <span className="self-start text-xs font-semibold px-2 py-0.5 rounded-full mb-3" style={{ backgroundColor: `${color}1A`, color }}>
           {priceLabel}
@@ -90,7 +118,7 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
           onClick={onAction}
           className="px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
           style={{
-            backgroundColor: gated ? "#E5E7EB" : isContest ? CONTEST_COLOR : color,
+            backgroundColor: gated ? "#E5E7EB" : accentColor,
             color: gated ? brandColors.primary : "#fff",
           }}
         >
@@ -100,7 +128,7 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
           <button
             onClick={onSecondaryAction}
             className="px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-gray-50"
-            style={{ borderColor: isContest ? CONTEST_COLOR : color, color: isContest ? CONTEST_COLOR : color }}
+            style={{ borderColor: accentColor, color: accentColor }}
           >
             {secondaryLabel}
           </button>
@@ -108,7 +136,8 @@ const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLa
       </div>
     </div>
   </div>
-)
+  )
+}
 
 const Grid = ({ children }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">{children}</div>
@@ -376,28 +405,33 @@ const TrackDetail = () => {
     }
     const gated = isExamGated(item)
     const isContest = item.contest === true || item.contest === "true" || item.contest === 1
+    const isPractice = !isContest && (item.mode === 'practice' || item.mode === 'both')
     const hasAttempts = quizDetails.some(q => q.quizId === item.id)
+
+    const examActionLabel = gated ? "Register for competition first"
+      : isContest ? "Join Contest"
+      : isPractice ? "Open Practice"
+      : hasAttempts ? "Retake Quiz" : "Start Quiz"
+
+    const examAction = gated ? () => setActiveTab("competitions")
+      : isContest ? () => { localStorage.removeItem("saved-quiz"); localStorage.removeItem("saved-answers"); localStorage.removeItem("saved-time"); navigate("/contest-overview", { state: { contest: item, isContest: true } }) }
+      : isPractice ? () => navigate("/practice-overview", { state: { exam: item, from: `/track/${slug}` } })
+      : () => handleExamClick(item)
+
     return (
       <ContentCard
         key={item.id}
         title={item.title}
         color={color}
         isContest={isContest}
-        actionLabel={
-          gated ? "Register for competition first"
-          : isContest ? "Join Contest"
-          : hasAttempts ? "Retake Quiz" : "Start Quiz"
-        }
-        onAction={
-          gated ? () => setActiveTab("competitions")
-          : isContest ? () => { localStorage.removeItem("saved-quiz"); localStorage.removeItem("saved-answers"); localStorage.removeItem("saved-time"); navigate("/contest-overview", { state: { contest: item, isContest: true } }) }
-          : () => handleExamClick(item)
-        }
+        isPractice={isPractice}
+        actionLabel={examActionLabel}
+        onAction={examAction}
         isNew={!gated && newExamIds.has(item.id)}
         image={item.image || null}
         gated={gated}
-        onSecondaryAction={(!gated && !isContest && hasAttempts) ? () => handleViewResults(item) : undefined}
-        secondaryLabel={(!gated && !isContest && hasAttempts) ? "View Results" : undefined}
+        onSecondaryAction={(!gated && !isContest && !isPractice && hasAttempts) ? () => handleViewResults(item) : undefined}
+        secondaryLabel={(!gated && !isContest && !isPractice && hasAttempts) ? "View Results" : undefined}
         meta={
           <>
             <span className="flex items-center gap-1"><FileQuestion size={12} /> {item.number_of_questions} questions</span>

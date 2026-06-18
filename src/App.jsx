@@ -62,7 +62,9 @@ import { ensureAccessibilityBar } from './Components/AccessibilityBar';
 // import { LeaderboardPage } from "./Pages/Leaderboard";
 // import ContestJoinPage from "./Pages/JoinContest";
 import ContextOverview from "./Pages/ContestOverviewPage";
-import 	ContextPage from "./Pages/ContestPage";
+import ContextPage from "./Pages/ContestPage";
+import PracticeOverviewPage from "./Pages/PracticeOverviewPage";
+import PracticeModePage from "./Pages/PracticeModePage";
 
 import Leaderboard from "./Pages/Leaderboard";
 
@@ -135,7 +137,7 @@ function App() {
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard")&&<Sidebar className="overflow-y-hidden" />}
+			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard" || location.pathname=="/practice-overview" || location.pathname=="/practice")&&<Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				<Route index element={<LandingPages/>}/>
@@ -200,6 +202,8 @@ function App() {
 
 				<Route path="/contest-overview" element={<ContextOverview />} />
 				<Route path="/contest-page" element={<ContextPage />} />
+				<Route path="/practice-overview" element={<PracticeOverviewPage />} />
+				<Route path="/practice" element={<PracticeModePage />} />
 				<Route path="/leaderboard" element={<Leaderboard/>}/>
 
 				<Route path="/pathway" element={<PathwayLandingPage />} />
