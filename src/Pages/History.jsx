@@ -278,7 +278,7 @@ const History = () => {
           </div>
           <h1 className="text-3xl font-bold" style={{ color: brandColors.primary }}>My History</h1>
         </div>
-        <p className="text-gray-500 mb-8">Your full activity record — registrations, assessment attempts, and course progress.</p>
+        <p className="text-gray-500 mb-8">Your full activity record: registrations, assessment attempts, and course progress.</p>
 
         {/* Tab bar */}
         <div className="flex items-center gap-1 mb-8 border-b" style={{ borderColor: brandColors.border }}>

@@ -1,25 +1,36 @@
 import React, { useEffect } from 'react';
-import { ArrowLeft, Brain, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Clock, Brain } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function FlashcardsPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // CoursePage passes courseData via location state
-  const courseData = location.state || {};
-  const courseId = courseData.id || courseData._id || null;
-  const courseTitle = courseData.title || "Study Flashcards";
+  // Two entry points:
+  // 1. From TrackDetail flashcards tab: { trackId, subject, grade, title, flashcards[] }
+  // 2. From CoursePage: courseData with id/_id and title
+  const state = location.state || {};
+  const isTrackSource = !!state.trackId;
 
-  // Persist courseId so ClassicFlashcards / TimedChallenge can find it after navigation
+  const courseId   = state.id || state._id || null;
+  const trackId    = state.trackId || null;
+  const pageTitle  = state.title || state.subject || "Study Flash Cards";
+  const subLabel   = state.grade ? `Grade ${state.grade}` : null;
+
   useEffect(() => {
-    if (courseId) {
-      localStorage.setItem("courseId", courseId);
+    if (courseId) localStorage.setItem("courseId", courseId);
+    if (trackId)  localStorage.setItem("flashcardTrackId", trackId);
+    // If the track passed pre-fetched flashcards, cache them for the study view
+    if (state.flashcards?.length) {
+      localStorage.setItem("flashcardSet", JSON.stringify(state.flashcards));
+    } else if (!isTrackSource) {
+      // Clear any stale track flashcard set when entering from course
+      localStorage.removeItem("flashcardTrackId");
+      localStorage.removeItem("flashcardSet");
     }
-  }, [courseId]);
+  }, [courseId, trackId]);
 
   const handleStudyModeSelect = (mode) => {
-    const state = courseData;
     switch (mode) {
       case 'classic': navigate('/flashcards/classic', { state }); break;
       case 'timed':   navigate('/flashcards/timed',   { state }); break;
@@ -38,7 +49,8 @@ export default function FlashcardsPage() {
             <ArrowLeft size={20} />
             Back
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{courseTitle}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">{pageTitle}</h1>
+          {subLabel && <p className="text-sm text-gray-500 mb-1">{subLabel}</p>}
           <p className="text-gray-600">Choose your study mode</p>
         </div>
 
@@ -49,9 +61,9 @@ export default function FlashcardsPage() {
           >
             <div className="text-center">
               <div className="p-3 bg-blue-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <Zap className="text-blue-600" size={24} />
+                <RotateCcw className="text-blue-600" size={24} />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Classic Flashcards</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Classic Flash Cards</h3>
               <p className="text-gray-600">Flip cards to study at your own pace</p>
             </div>
           </div>

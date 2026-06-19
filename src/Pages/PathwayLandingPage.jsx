@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Route, Clock, Users, BookOpen, CheckCircle, ArrowRight, Star, Target, Trophy, Play, ChevronRight, Code, Palette, PenTool, Calculator, Lightbulb, Award, Globe, Zap, Brain, Rocket, Filter, Search, User, Calendar, ChevronLeft, ChevronDown, Flame, TrendingUp, Medal, Lock, Unlock, FileText, Video, Gift, Shield, Heart, Sparkles } from 'lucide-react';
+import { Route, Clock, Users, BookOpen, CheckCircle, ArrowRight, Star, Target, Trophy, Play, ChevronRight, Code, Palette, PenTool, Calculator, Lightbulb, Award, Globe, Zap, Brain, Rocket, Filter, Search, User, Calendar, ChevronLeft, ChevronDown, Flame, TrendingUp, Medal, Lock, Unlock, FileText, Video, Gift, Shield, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PathwayLearningPage = () => {
@@ -408,7 +408,7 @@ const PathwayLearningPage = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-white/80">Level</span>
                         <span className="font-semibold flex items-center">
-                          <Sparkles className="w-4 h-4 mr-1" />
+                          <Star className="w-4 h-4 mr-1" />
                           {track.level}
                         </span>
                       </div>
@@ -522,7 +522,7 @@ const PathwayLearningPage = () => {
               {/* Level and XP Display */}
               <div className="text-right">
                 <div className="flex items-center justify-end space-x-2 mb-2">
-                  <Sparkles className="w-5 h-5 text-yellow-300" />
+                  <Star className="w-5 h-5 text-yellow-300" />
                   <span className="text-lg font-bold">Level {track.level}</span>
                 </div>
                 <div className="flex items-center space-x-2">

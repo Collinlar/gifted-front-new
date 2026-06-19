@@ -18,7 +18,6 @@ import {
   Home,
   TrendingUp,
   Medal,
-  Sparkles,
   ChevronRight,
   Users,
   Calendar
@@ -747,7 +746,7 @@ export default function ContestPage() {
                       transition={{ duration: 2, repeat: Infinity }}
                       className="mb-4"
                     >
-                      <Sparkles size={50} className="mx-auto" />
+                      <Trophy size={50} className="mx-auto" />
                     </motion.div>
                     
                     <motion.h4 

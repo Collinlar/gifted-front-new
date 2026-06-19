@@ -165,6 +165,101 @@ export async function verifyRegistration(userId, programName) {
 
 // ─── Courses ───────────────────────────────────────────────────────────────────
 
+export async function getCompetitionById(id) {
+  const { data, error } = await supabaseAdmin
+    .from('competitions')
+    .select('*')
+    .or(`id.eq.${id},mongo_id.eq.${id}`)
+    .maybeSingle()
+  if (error) throw error
+  return { success: true, competition: data }
+}
+
+export async function getFlashcardsBySubjectGrade(subject, grade) {
+  let q = supabaseAdmin.from('flashcards').select('*').eq('publish', true)
+  if (subject) q = q.eq('subject', subject)
+  if (grade)   q = q.eq('grade', grade)
+  const { data, error } = await q
+  if (error) throw error
+  return { success: true, flashcards: data || [] }
+}
+
+export async function getCourseById(courseId) {
+  const { data, error } = await supabaseAdmin
+    .from('courses')
+    .select('*')
+    .or(`id.eq.${courseId},mongo_id.eq.${courseId}`)
+    .maybeSingle()
+  if (error) throw error
+  return { success: true, course: data }
+}
+
+export async function getCourseStepProgress(userId, courseId) {
+  // Use limit(1) instead of maybeSingle() — if duplicate rows exist (no unique constraint),
+  // maybeSingle() returns null which makes progress appear empty on every refresh.
+  const { data } = await supabaseAdmin
+    .from('course_progress')
+    .select('step_status')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .limit(1)
+  const row = Array.isArray(data) ? data[0] : data
+  return { stepStatus: row?.step_status || [] }
+}
+
+async function _getOrCreateProgress(userId, courseId) {
+  const { data } = await supabaseAdmin
+    .from('course_progress')
+    .select('step_status')
+    .eq('user_id', userId)
+    .eq('course_id', courseId)
+    .limit(1)
+  const rows = Array.isArray(data) ? data : (data ? [data] : [])
+  return rows[0] || null
+}
+
+async function _saveProgress(userId, courseId, stepStatus, hasExisting) {
+  if (hasExisting) {
+    const { error } = await supabaseAdmin
+      .from('course_progress')
+      .update({ step_status: stepStatus })
+      .eq('user_id', userId)
+      .eq('course_id', courseId)
+    if (error) throw error
+  } else {
+    const { error } = await supabaseAdmin
+      .from('course_progress')
+      .insert({ user_id: userId, course_id: courseId, step_status: stepStatus })
+    if (error) throw error
+  }
+}
+
+export async function markStepComplete(userId, courseId, stepId, completed = true) {
+  const existing = await _getOrCreateProgress(userId, courseId)
+  const stepStatus = existing?.step_status ? [...existing.step_status] : []
+  const idx = stepStatus.findIndex(s => s.step_id === stepId)
+  if (idx >= 0) {
+    stepStatus[idx] = { ...stepStatus[idx], completed, completed_at: new Date().toISOString() }
+  } else {
+    stepStatus.push({ step_id: stepId, completed, completed_at: new Date().toISOString() })
+  }
+  await _saveProgress(userId, courseId, stepStatus, !!existing)
+  return { success: true }
+}
+
+export async function updateStepNote(userId, courseId, stepId, note) {
+  const existing = await _getOrCreateProgress(userId, courseId)
+  const stepStatus = existing?.step_status ? [...existing.step_status] : []
+  const idx = stepStatus.findIndex(s => s.step_id === stepId)
+  if (idx >= 0) {
+    stepStatus[idx] = { ...stepStatus[idx], note }
+  } else {
+    stepStatus.push({ step_id: stepId, completed: false, note })
+  }
+  await _saveProgress(userId, courseId, stepStatus, !!existing)
+  return { success: true }
+}
+
 export async function getAllCoursesInfo() {
   const { data, error } = await supabaseAdmin
     .from('courses')
@@ -437,9 +532,23 @@ export async function getFlashCards(courseId) {
     .from('flashcards')
     .select('*')
     .eq('course_id', courseId)
+    .eq('publish', true)
 
   if (error) throw error
-  return { success: true, flashcards: data }
+  return { success: true, flashcards: data || [] }
+}
+
+export async function getTrackFlashcards(trackId) {
+  const { data, error } = await supabaseAdmin
+    .from('flashcards')
+    .select('*')
+    .eq('track_id', trackId)
+    .eq('publish', true)
+    .order('subject')
+    .order('grade')
+
+  if (error) throw error
+  return { success: true, flashcards: data || [] }
 }
 
 export async function getTimedChallenge(courseId) {
@@ -889,7 +998,21 @@ export async function getTrackContent(trackId) {
     return acc
   }, {})
 
-  const [competitions, courses, exams, camps] = await Promise.all([
+  // Normalize a raw Supabase exam row so snake_case columns are available as
+  // camelCase — the pages (Question.jsx, QuizOverview.jsx) expect camelCase.
+  // Keep the snake_case keys too so TrackDetail.jsx's existing reads still work.
+  const normalizeExam = (e) => ({
+    ...e,
+    numberOfQuestions:  e.number_of_questions  ?? e.numberOfQuestions,
+    attemptsAllowed:    e.attempts_allowed      ?? e.attemptsAllowed     ?? 0,
+    allowQuizReview:    e.allow_quiz_review     ?? e.allowQuizReview     ?? false,
+    displayScores:      e.display_scores        ?? e.displayScores       ?? true,
+    showFeedbackForm:   e.show_feedback_form    ?? e.showFeedbackForm    ?? false,
+    shuffleQuestions:   e.shuffle_questions     ?? e.shuffleQuestions    ?? false,
+    hintsEnabled:       e.hints_enabled         ?? e.hintsEnabled        ?? true,
+  })
+
+  const [competitions, courses, exams, camps, flashcards] = await Promise.all([
     idsByType.competition?.length
       ? supabaseAdmin.from('competitions').select('*').in('id', idsByType.competition).then(r => r.data || [])
       : Promise.resolve([]),
@@ -897,14 +1020,17 @@ export async function getTrackContent(trackId) {
       ? supabaseAdmin.from('courses').select('*').in('id', idsByType.course).then(r => r.data || [])
       : Promise.resolve([]),
     idsByType.exam?.length
-      ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).then(r => r.data || [])
+      ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).then(r => r.data || []).then(rows => rows.map(normalizeExam))
       : Promise.resolve([]),
     idsByType.camp?.length
       ? supabaseAdmin.from('camps').select('*').in('id', idsByType.camp).then(r => r.data || [])
       : Promise.resolve([]),
+    // Flashcards are linked by track_id directly, not via track_items
+    supabaseAdmin.from('flashcards').select('*').eq('track_id', trackId).eq('publish', true)
+      .order('subject').order('grade').then(r => r.data || []),
   ])
 
-  return { success: true, competitions, courses, exams, camps }
+  return { success: true, competitions, courses, exams, camps, flashcards }
 }
 
 // ─── Enrollments ───────────────────────────────────────────────────────────────

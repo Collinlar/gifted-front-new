@@ -36,7 +36,7 @@ function MasteryRing({ score, size = 80, label }) {
 
 function ExamReadinessBar({ readiness }) {
   const color = readiness >= 75 ? '#1D9E75' : readiness >= 50 ? '#E8A020' : '#EF4444'
-  const label = readiness >= 75 ? 'Ready to sit the exam' : readiness >= 50 ? 'Getting there — keep practising' : 'More practice needed'
+  const label = readiness >= 75 ? 'Ready to sit the exam' : readiness >= 50 ? 'Getting there. Keep practising.' : 'More practice needed'
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5">
@@ -199,7 +199,7 @@ export default function PracticeOverviewPage() {
                     {avgMastery >= 0.8
                       ? 'Strong. Your accuracy is consistently high.'
                       : avgMastery >= 0.5
-                      ? 'Building. Keep going — more sessions will sharpen this.'
+                      ? 'Building. Keep going. More sessions will sharpen this.'
                       : 'Early days. Each session brings you closer.'}
                   </div>
                   {readiness < 75 && (

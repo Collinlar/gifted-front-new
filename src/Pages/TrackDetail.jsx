@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useLocation, Link } from "react-router-dom"
-import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X, Zap } from "lucide-react"
+import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X, Zap, Layers } from "lucide-react"
 import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
 
@@ -18,9 +18,9 @@ const PAGE_SIZE = 6
 
 const TABS = [
   { key: "competitions", label: "Olympiads & Competitions", icon: <Trophy size={15} /> },
-  { key: "camps", label: "Camps", icon: <Tent size={15} /> },
-  { key: "courses", label: "Resources", icon: <BookOpen size={15} /> },
-  { key: "exams", label: "Assessments", icon: <ClipboardCheck size={15} /> },
+  { key: "camps",        label: "Camps",                    icon: <Tent size={15} /> },
+  { key: "courses",      label: "Resources",                icon: <BookOpen size={15} /> },
+  { key: "exams",        label: "Assessments",              icon: <ClipboardCheck size={15} /> },
 ]
 
 const formatDateRange = (start, end) => {
@@ -29,21 +29,22 @@ const formatDateRange = (start, end) => {
   return start || end
 }
 
-const CONTEST_COLOR = "#E8A020"
-
-const PRACTICE_COLOR = "#1D9E75"
-const EXAM_COLOR     = "#185FA5"
+const CONTEST_COLOR   = "#E8A020"
+const PRACTICE_COLOR  = "#1D9E75"
+const EXAM_COLOR      = "#185FA5"
+const FLASHCARD_COLOR = "#7C3AED"
 
 const MODE_BADGE = {
-  contest:  { bg: CONTEST_COLOR,  label: "Contest",  Icon: Zap },
-  practice: { bg: PRACTICE_COLOR, label: "Practice", Icon: BookOpen },
-  exam:     { bg: EXAM_COLOR,     label: "Exam",     Icon: FileQuestion },
+  contest:   { bg: CONTEST_COLOR,   label: "Contest",      Icon: Zap },
+  practice:  { bg: PRACTICE_COLOR,  label: "Practice",     Icon: BookOpen },
+  exam:      { bg: EXAM_COLOR,      label: "Exam",         Icon: FileQuestion },
+  flashcard: { bg: FLASHCARD_COLOR, label: "Flash Cards",  Icon: Layers },
 }
 
-const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel, isContest, isPractice, readiness }) => {
-  const mode = isContest ? 'contest' : isPractice ? 'practice' : 'exam'
+const ContentCard = ({ title, meta, color, onAction, actionLabel, isNew, priceLabel, image, registeredBadge, gated, onSecondaryAction, secondaryLabel, isContest, isPractice, isFlashcard, readiness }) => {
+  const mode = isContest ? 'contest' : isPractice ? 'practice' : isFlashcard ? 'flashcard' : 'exam'
   const badge = MODE_BADGE[mode]
-  const accentColor = isContest ? CONTEST_COLOR : isPractice ? PRACTICE_COLOR : color
+  const accentColor = isContest ? CONTEST_COLOR : isPractice ? PRACTICE_COLOR : isFlashcard ? FLASHCARD_COLOR : color
 
   return (
   <div
@@ -168,7 +169,7 @@ const TrackDetail = () => {
   const userId = getTokenUserId()
 
   const [track, setTrack] = useState(null)
-  const [content, setContent] = useState({ competitions: [], courses: [], exams: [], camps: [] })
+  const [content, setContent] = useState({ competitions: [], courses: [], exams: [], camps: [], flashcards: [] })
   const [quizDetails, setQuizDetails] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
@@ -182,6 +183,9 @@ const TrackDetail = () => {
   const [regGrade, setRegGrade] = useState("")
   const [regSaving, setRegSaving] = useState(false)
   const [regError, setRegError] = useState("")
+
+  // Grade filtering state
+  const [gradePromptDismissed, setGradePromptDismissed] = useState(false)
 
   // Results modal state
   const [resultsModal, setResultsModal] = useState(null) // { exam } | null
@@ -333,7 +337,73 @@ const TrackDetail = () => {
     )
   }
 
-  const activeItems = content[activeTab] || []
+  // Grade filtering
+  const userProfile = JSON.parse(localStorage.getItem('user') || '{}')
+  const userGrade = String(userProfile.grade || '').replace(/grade\s*/i, '').trim()
+
+  // Academic year progression (Ghana: new year starts September)
+  const now = new Date()
+  const currentAcademicYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
+  const storedGradeYear = parseInt(localStorage.getItem('grade_academic_year') || '0')
+  const showGradePrompt = !gradePromptDismissed && userGrade && storedGradeYear > 0 && storedGradeYear < currentAcademicYear
+  const nextGrade = userGrade ? String(parseInt(userGrade) + 1) : ''
+
+  // Set grade_academic_year on first load if not set
+  if (userGrade && !storedGradeYear) {
+    localStorage.setItem('grade_academic_year', String(currentAcademicYear))
+  }
+
+  const matchesUserGrade = (item) => {
+    if (!userGrade) return true
+    const grades = Array.isArray(item.grade)
+      ? item.grade.map(g => String(g).replace(/grade\s*/i, '').trim())
+      : item.grade ? [String(item.grade).replace(/grade\s*/i, '').trim()] : []
+    if (grades.length === 0) return true  // untagged = visible to all grades
+    return grades.includes(userGrade)
+  }
+
+  // Both gates must pass: item must be published AND match user's grade
+  const isPublished = (item) => {
+    // Supabase column is "publish" (set by admin). Fall back to "published" for other content types.
+    const flag = item.publish ?? item.published
+    if (flag === undefined || flag === null) return true  // no publish column = visible by default
+    return flag === true || flag === 1 || flag === 'true'
+  }
+
+  // Group flashcards by subject for display — each group becomes one study card
+  const flashcardGroups = (() => {
+    const map = new Map()
+    for (const fc of (content.flashcards || [])) {
+      const key = (fc.subject || '') + '|' + (fc.grade || '')
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          subject: fc.subject || track?.name || 'Flash Cards',
+          grade: fc.grade || '',
+          trackId: fc.track_id || fc.trackId,
+          cards: [],
+        })
+      }
+      map.get(key).cards.push(fc)
+    }
+    return [...map.values()].map(g => ({ ...g, count: g.cards.length }))
+  })()
+
+  // Exams tab merges assessed content + flashcard groups.
+  // Flashcard groups are pre-filtered (publish=true at API level); grade shown as metadata not a gate.
+  const allActiveItems = activeTab === 'exams'
+    ? [...(content.exams || []).filter(isPublished), ...flashcardGroups]
+    : (content[activeTab] || []).filter(isPublished)
+
+  const activeItems = activeTab === 'exams'
+    ? [
+        ...(content.exams || []).filter(isPublished).filter(matchesUserGrade),
+        ...flashcardGroups,  // flashcard groups shown to all grades — grade is metadata on each card
+      ]
+    : allActiveItems.filter(matchesUserGrade)
+
+  const hiddenByGrade = allActiveItems.length - activeItems.length
+
   const isExpanded = !!expandedTabs[activeTab]
   const visibleItems = isExpanded ? activeItems : activeItems.slice(0, PAGE_SIZE)
 
@@ -403,6 +473,36 @@ const TrackDetail = () => {
         />
       )
     }
+    // Flashcard group (has a `cards` array — merged into the exams tab)
+    if (Array.isArray(item.cards)) {
+      const cardCount = item.count || item.cards.length || 0
+      const subjectLabel = [item.subject, item.grade ? `Grade ${item.grade}` : null].filter(Boolean).join(" · ")
+      return (
+        <ContentCard
+          key={item.id}
+          title={item.subject || "Flash Cards"}
+          color={FLASHCARD_COLOR}
+          isFlashcard
+          actionLabel="Study this set"
+          onAction={() => navigate("/flashcards", {
+            state: {
+              trackId: item.trackId,
+              subject: item.subject,
+              grade: item.grade,
+              title: item.subject || track?.name,
+              flashcards: item.cards,
+            }
+          })}
+          meta={
+            <>
+              <span className="flex items-center gap-1"><Layers size={12} /> {cardCount} card{cardCount !== 1 ? "s" : ""}</span>
+              {subjectLabel && <span>{subjectLabel}</span>}
+            </>
+          }
+        />
+      )
+    }
+
     const gated = isExamGated(item)
     const isContest = item.contest === true || item.contest === "true" || item.contest === 1
     const isPractice = !isContest && (item.mode === 'practice' || item.mode === 'both')
@@ -443,12 +543,17 @@ const TrackDetail = () => {
     )
   }
 
-  const emptyLabel = {
-    competitions: "No competitions tagged into this track yet.",
-    camps: "No camps scheduled in this track yet.",
-    courses: "No resources tagged into this track yet.",
-    exams: "No assessments tagged into this track yet.",
-  }[activeTab]
+  const totalInTab = activeTab === 'exams'
+    ? (content.exams || []).filter(isPublished).length + flashcardGroups.length
+    : (content[activeTab] || []).filter(isPublished).length
+  const emptyLabel = activeItems.length === 0 && totalInTab > 0 && userGrade
+    ? `No ${activeTab === 'courses' ? 'resources' : 'assessments'} for Grade ${userGrade} in this track yet.`
+    : {
+        competitions: "No competitions in this track yet.",
+        camps:        "No camps scheduled in this track yet.",
+        courses:      "No resources in this track yet.",
+        exams:        "No assessments or flash cards in this track yet.",
+      }[activeTab]
 
   return (
     <>
@@ -464,7 +569,7 @@ const TrackDetail = () => {
             <div>
               <h1 className="text-3xl font-bold text-white">{track.name} Track</h1>
               <p className="text-white/80 mt-1 max-w-2xl">
-                {track.description || `Everything in ${track.name} — Olympiads, competitions, camps, resources and assessments — in one place.`}
+                {track.description || `Everything in ${track.name}: Olympiads, competitions, camps, resources and assessments, in one place.`}
               </p>
             </div>
           </div>
@@ -484,7 +589,9 @@ const TrackDetail = () => {
         <div className="flex flex-wrap gap-2 mb-8 border-b pb-px" style={{ borderColor: brandColors.border }}>
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key
-            const count = content[tab.key]?.length || 0
+            const count = tab.key === 'exams'
+              ? (content.exams?.length || 0) + flashcardGroups.length
+              : (content[tab.key]?.length || 0)
             const newCount = tab.key === "exams" ? newExamIds.size : 0
             return (
               <button
@@ -514,6 +621,55 @@ const TrackDetail = () => {
             )
           })}
         </div>
+
+        {/* Grade progression prompt */}
+        {showGradePrompt && (
+          <div className="mb-6 rounded-xl border px-5 py-4 flex items-start justify-between gap-4" style={{ backgroundColor: '#FEF3E2', borderColor: '#E8A020' }}>
+            <div>
+              <p className="text-sm font-semibold text-amber-900">New academic year. Still in Grade {userGrade}?</p>
+              <p className="text-xs text-amber-700 mt-0.5">If you moved up, update your grade so your content stays relevant.</p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => {
+                    const updated = { ...userProfile, grade: nextGrade }
+                    localStorage.setItem('user', JSON.stringify(updated))
+                    localStorage.setItem('grade_academic_year', String(currentAcademicYear))
+                    setGradePromptDismissed(true)
+                    window.location.reload()
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                  style={{ backgroundColor: '#E8A020' }}
+                >
+                  I moved to Grade {nextGrade}
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('grade_academic_year', String(currentAcademicYear))
+                    setGradePromptDismissed(true)
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-800 border border-amber-300"
+                >
+                  Still in Grade {userGrade}
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setGradePromptDismissed(true)} className="text-amber-400 hover:text-amber-600 shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Grade filter indicator */}
+        {userGrade && (
+          <div className="mb-4">
+            <span className="text-xs text-gray-500">
+              Showing content for <span className="font-semibold text-gray-700">Grade {userGrade}</span>
+              {hiddenByGrade > 0 && (
+                <span className="text-gray-400"> · {hiddenByGrade} item{hiddenByGrade > 1 ? 's' : ''} from other grades not shown</span>
+              )}
+            </span>
+          </div>
+        )}
 
         <div className="mb-12">
           {activeItems.length === 0 ? (

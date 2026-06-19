@@ -147,7 +147,7 @@ export default function PracticeModePage() {
       setHint(text)
       setHintsUsed(h => h + 1)
     } catch {
-      setHint('Focus on the key concept in the question — what is it really asking you to compare or identify?')
+      setHint('Focus on the key concept in the question. What is it really asking you to compare or identify?')
     } finally {
       setLoadingHint(false)
     }
@@ -206,7 +206,7 @@ export default function PracticeModePage() {
       <div className="flex flex-col items-center justify-center h-screen gap-4 px-6 text-center">
         <Target size={48} className="text-teal-500" />
         <h2 className="text-2xl font-semibold text-gray-800">You have mastered all questions here.</h2>
-        <p className="text-gray-500">Come back later — spaced repetition will resurface questions when it is time to review.</p>
+        <p className="text-gray-500">Come back later. Spaced repetition will resurface questions when it is time to review.</p>
         <button
           onClick={() => navigate(fromPath)}
           className="mt-4 px-6 py-3 rounded-lg text-white font-medium"
@@ -447,7 +447,7 @@ export default function PracticeModePage() {
                   }`}>
                     {selectedAnswer === correctIndex
                       ? <><CheckCircle size={16} /> Correct</>
-                      : <><XCircle size={16} /> Not quite — the right answer is {String.fromCharCode(65 + correctIndex)}</>
+                      : <><XCircle size={16} /> Not quite. The right answer is {String.fromCharCode(65 + correctIndex)}</>
                     }
                   </div>
                   <div className="text-sm text-gray-700">

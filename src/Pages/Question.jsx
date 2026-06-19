@@ -73,13 +73,11 @@ const QuizPage = () => {
         localStorage.removeItem("saved-quiz")
         localStorage.removeItem("saved-answers")
         localStorage.removeItem("saved-time")
-        const shuffledQuestions = shuffleArray(
-          original.questions.map((q) => ({
-            ...q,
-            answers: shuffleArray(q.answers),
-          }))
-        )
-        const newQuizData = { ...original, questions: shuffledQuestions }
+        const shouldShuffle = original.shuffleQuestions !== false && original.shuffle_questions !== false
+        const preparedQuestions = shouldShuffle
+          ? shuffleArray(original.questions.map((q) => ({ ...q, answers: shuffleArray(q.answers) })))
+          : original.questions
+        const newQuizData = { ...original, questions: preparedQuestions }
         setShuffledQuizData(newQuizData)
         setSelectedAnswers({})
         setTimeLeft(newQuizData.time * 60)

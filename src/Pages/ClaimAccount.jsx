@@ -394,13 +394,13 @@ export default function ClaimAccount() {
                   className="w-full py-3 rounded-lg text-white text-sm font-medium mb-3"
                   style={{ backgroundColor: brandColors.primary }}
                 >
-                  Yes, that's me — set my password
+                  Yes, that's me. Set my password.
                 </button>
                 <button
                   onClick={handleDenyConfirm}
                   className="w-full py-2.5 text-sm text-center text-gray-500 hover:text-gray-700"
                 >
-                  That's not me — try a different number
+                  That's not me. Try a different number.
                 </button>
               </motion.div>
             )}
@@ -461,7 +461,7 @@ export default function ClaimAccount() {
                       </button>
                     </div>
                     {password.length > 0 && password.length < 6 && (
-                      <p className="text-xs text-amber-600 mt-1">Too short — needs at least 6 characters</p>
+                      <p className="text-xs text-amber-600 mt-1">Too short. Needs at least 6 characters.</p>
                     )}
                   </div>
 

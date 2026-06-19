@@ -1,89 +1,66 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   RotateCcw,
   CheckCircle,
   X,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  TrendingUp,
+  CheckCircle as CheckCircleSolid
 } from 'lucide-react';
-import { getFlashCards } from "../lib/api"
-import { useNavigate } from 'react-router-dom';
+import { getFlashCards, getTrackFlashcards } from "../lib/api"
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function ClassicFlashcards() {
   const [currentCard, setCurrentCard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [studiedCards, setStudiedCards] = useState(new Set());
   const [isAnimating, setIsAnimating] = useState(false);
-  const [flashcards,setFlashCards]= useState([])
+  const [flashcards, setFlashCards] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [noFlashcards, setNoFlashcards] = useState(false)
   const navigate = useNavigate()
-
-  // Mock flashcard data
-  const flashcardss = [
-    {
-      id: 1,
-      question: "What is the capital of France?",
-      answer: "Paris is the capital and largest city of France, known for its art, fashion, and culture.",
-      difficulty: "easy"
-    },
-    {
-      id: 2,
-      question: "What is photosynthesis?",
-      answer: "Photosynthesis is the process by which plants convert light energy into chemical energy using chlorophyll.",
-      difficulty: "medium"
-    },
-    {
-      id: 3,
-      question: "Who wrote 'Romeo and Juliet'?",
-      answer: "William Shakespeare wrote the famous tragedy 'Romeo and Juliet' in the early part of his career.",
-      difficulty: "easy"
-    },
-    {
-      id: 4,
-      question: "What is the largest planet in our solar system?",
-      answer: "Jupiter is the largest planet in our solar system, with a mass greater than all other planets combined.",
-      difficulty: "easy"
-    },
-    {
-      id: 5,
-      question: "What is the chemical symbol for gold?",
-      answer: "Au is the chemical symbol for gold, derived from the Latin word 'aurum'.",
-      difficulty: "medium"
-    }
-  ];
+  const location = useLocation()
+  const locationState = location.state || {}
 
 
-  
+
   useEffect(() => {
     const fetchFlashCard = async () => {
       try {
         setIsLoading(true);
-        const courseId = localStorage.getItem("courseId");
-        
-        if (!courseId) {
-          console.log("No courseId found in localStorage");
-          setFlashCards([]);
-          setNoFlashcards(true);
-          return;
+
+        let cards = []
+
+        // Priority 1: flashcards passed directly via navigation state (from TrackDetail group)
+        if (locationState.flashcards?.length) {
+          cards = locationState.flashcards
+        }
+        // Priority 2: trackId — fetch all published flashcards for the track
+        else if (locationState.trackId) {
+          const response = await getTrackFlashcards(locationState.trackId)
+          cards = response.flashcards || []
+        }
+        // Priority 3: courseId — existing course-based flow
+        else {
+          const courseId = localStorage.getItem("courseId")
+          if (!courseId) {
+            setFlashCards([])
+            setNoFlashcards(true)
+            return
+          }
+          const response = await getFlashCards(courseId)
+          cards = response.flashcards || []
         }
 
-        const response = await getFlashCards(courseId);
-
-        if (response.flashcards && Array.isArray(response.flashcards) && response.flashcards.length > 0) {
-          const formattedCards = response.flashcards.map((item, index) => ({
-            ...item,
-            id: index
-          }));
-          setFlashCards(formattedCards);
-          setNoFlashcards(false);
-          console.log("Formatted flashcards:", formattedCards);
+        if (cards.length > 0) {
+          const formatted = cards.map((item, index) => ({ ...item, id: item.id || index }))
+          setFlashCards(formatted)
+          setNoFlashcards(false)
         } else {
-          console.log("No questions found in response");
-          setFlashCards([]);
-          setNoFlashcards(true);
+          setFlashCards([])
+          setNoFlashcards(true)
         }
       } catch (error) {
         console.log("Error fetching flashcards:", error);
@@ -95,7 +72,7 @@ function ClassicFlashcards() {
     };
 
     fetchFlashCard();
-  }, []); // Empty dependency array is fine since we only want this to run once on mount
+  }, []);
   
 
   const handleFlip = () => {
@@ -135,7 +112,6 @@ function ClassicFlashcards() {
    const progress = flashcards.length > 0 ? ((currentCard + 1) / flashcards.length) * 100 : 0;
    const currentFlashcard = flashcards[currentCard];
    const isStudied = currentFlashcard ? studiedCards.has(currentFlashcard.id) : false;
-   console.log("Current flashcard:", currentFlashcard);
 
 
   if (isLoading) {
@@ -201,7 +177,7 @@ function ClassicFlashcards() {
           <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="text-indigo-500" size={20} />
+                <TrendingUp className="text-indigo-500" size={20} />
                 <span className="font-semibold text-gray-700">Progress</span>
               </div>
               <div className="flex items-center gap-4">
@@ -361,7 +337,7 @@ function ClassicFlashcards() {
         {/* Completion Message */}
         {currentCard === flashcards.length - 1 && studiedCards.size === flashcards.length && (
           <div className="mt-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl p-8 text-center animate-slideUp">
-            <Sparkles className="mx-auto mb-4" size={48} />
+            <CheckCircleSolid className="mx-auto mb-4" size={48} />
             <h3 className="text-2xl font-bold mb-2">Congratulations!</h3>
             <p className="text-green-100">You've mastered all the flashcards in this set!</p>
           </div>

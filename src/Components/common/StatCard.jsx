@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowDownRight, ArrowUpRight, ExternalLink, Sparkles } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, ExternalLink, Star } from "lucide-react"
 
 // Brand colors with additional shades
 const brandColors = {
@@ -100,7 +100,7 @@ const StatCard = ({
             className="flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-white shadow-md"
             style={{ backgroundColor: brandColors.accent }}
           >
-            <Sparkles size={12} className="shrink-0" />
+            <Star size={12} className="shrink-0" />
             <span>New</span>
           </motion.div>
         </div>
