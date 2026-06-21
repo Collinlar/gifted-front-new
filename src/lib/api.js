@@ -982,6 +982,53 @@ export async function setUserTracks(userId, trackIds) {
   return { success: true }
 }
 
+// ─── Announcements ────────────────────────────────────────────────────────────
+
+export async function getAnnouncementsForUser(userId) {
+  if (!userId) return { announcements: [] }
+  try {
+    const userRes = await supabaseAdmin.from('users').select('grade').eq('id', userId).single()
+    const userGrade = String(userRes.data?.grade || '')
+
+    const [tracksRes, dismissedRes] = await Promise.all([
+      supabaseAdmin.from('user_tracks').select('track_id').eq('user_id', userId),
+      supabaseAdmin.from('user_announcement_dismissals').select('announcement_id').eq('user_id', userId),
+    ])
+
+    const trackIds = (tracksRes.data || []).map(t => t.track_id)
+    const dismissedIds = new Set((dismissedRes.data || []).map(d => d.announcement_id))
+
+    const now = new Date().toISOString()
+    const { data: all } = await supabaseAdmin
+      .from('announcements')
+      .select('*')
+      .eq('is_published', true)
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    const filtered = (all || []).filter(a => {
+      if (dismissedIds.has(a.id)) return false
+      const grades = a.target_grades || []
+      if (grades.length > 0 && !grades.includes(userGrade)) return false
+      const tracks = a.target_tracks || []
+      if (tracks.length > 0 && !tracks.some(t => trackIds.includes(t))) return false
+      return true
+    })
+
+    return { announcements: filtered }
+  } catch {
+    return { announcements: [] }
+  }
+}
+
+export async function dismissAnnouncement(userId, announcementId) {
+  await supabaseAdmin.from('user_announcement_dismissals').upsert(
+    { user_id: userId, announcement_id: announcementId, dismissed_at: new Date().toISOString() },
+    { onConflict: 'user_id,announcement_id' }
+  )
+}
+
 // Fetches every competition/course/exam/camp tagged into a track, fully hydrated.
 // Returns them grouped by item_type so the track hub page can render each section directly.
 export async function getTrackContent(trackId) {

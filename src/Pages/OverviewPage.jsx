@@ -13,7 +13,7 @@ import axios from "axios";
 import { getQuizDetails, getAllLearningResourceAnalytics, getUserDetails, getUserTracks, getTrackContent } from "../lib/api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { jwtDecode } from "jwt-decode";
-import AnnouncementModal from "./AnnouncementModal";
+import AnnouncementsSection from "./AnnouncementsSection";
 
 // Brand colors
 const brandColors = {
@@ -440,6 +440,9 @@ const OverviewPage = () => {
             Track your programs, access learning resources, and take assessments all in one place.
           </p>
         </motion.div>
+
+        {/* Announcements */}
+        <AnnouncementsSection />
 
         {/* Continue Your Track */}
         <div className="mb-10">
