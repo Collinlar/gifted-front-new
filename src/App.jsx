@@ -5,6 +5,7 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import Sidebar from "./Components/common/Sidebar";
 
 import OverviewPage from "./Pages/OverviewPage";
+import ExamPortal from "./Pages/ExamPortal";
 import Tracks from "./Pages/Tracks";
 import TrackDetail from "./Pages/TrackDetail";
 import Community from "./Pages/Community";
@@ -165,6 +166,10 @@ function App() {
 				<Route element={<SubDetails/>} path='/details/:id'/>
 				<Route element={<Invoice/>} path='/subitem/:name'/>
 				{/* <Route element={<Questions/>} path="/quiz-questions"/> */}
+
+				{/* Supervised exam sitting. Runs on the anon key through RPC only,
+				    so the answer key is never sent to the browser. */}
+				<Route element={<ExamPortal/>} path="/exam/:sessionCode"/>
 
 				<Route element={<Question/>} path="/quiz-questions"/>
 				<Route element={<QuizOverview/>} path="/quiz-overview"/>
