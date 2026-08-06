@@ -5,10 +5,14 @@
 // reaches the browser. Scoring happens inside Postgres on submit.
 import { supabase } from './supabase'
 
-// Supabase surfaces RAISE EXCEPTION as error.message. Those messages are
-// written for students, so pass them straight through.
+// Two failure shapes, both carrying messages written for students.
+//
+// `error` is a raised exception. `data.error` is a returned failure, used where
+// the function needed to write a security log row first: raising would roll the
+// transaction back and lose the very record we want to keep.
 function unwrap({ data, error }) {
   if (error) throw new Error(error.message || 'Something went wrong. Try again.')
+  if (data && typeof data === 'object' && data.error) throw new Error(data.error)
   return data
 }
 

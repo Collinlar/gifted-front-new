@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Clock, ShieldAlert, CheckCircle2, AlertCircle, Send, Loader2, Flag,
+  Pause as PauseIcon,
 } from "lucide-react"
 import {
   examGetPaper, examSaveProgress, examHeartbeat, examLogEvent, examSubmit,
@@ -22,6 +23,7 @@ export default function ExamRunner({ token, onFinished }) {
   const [flagged, setFlagged] = useState(() => new Set())
 
   const [remaining, setRemaining] = useState(null)
+  const [paused,    setPaused]    = useState(false)
   const [saving,    setSaving]    = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [submitting,  setSubmitting]  = useState(false)
@@ -41,6 +43,7 @@ export default function ExamRunner({ token, onFinished }) {
         if (!alive) return
         setPaper(p)
         setAnswers(p.savedAnswers || {})
+        setPaused(!!p.paused)
         const secs = Math.max(0, Math.floor((new Date(p.expiresAt) - new Date(p.serverNow)) / 1000))
         setRemaining(secs)
       } catch (e) {
@@ -74,11 +77,16 @@ export default function ExamRunner({ token, onFinished }) {
   // counter in devtools buys nothing.
   useEffect(() => {
     if (!paper || result) return
-    const tick = setInterval(() => setRemaining((r) => (r == null ? r : Math.max(0, r - 1))), 1000)
+    // The local tick stops while paused so the countdown holds still, matching
+    // the server, which measures remaining time to the moment of pausing.
+    const tick = setInterval(() => {
+      setRemaining((r) => (r == null || paused ? r : Math.max(0, r - 1)))
+    }, 1000)
     const beat = setInterval(async () => {
       try {
         const h = await examHeartbeat(token)
         setRemaining(h.remainingSeconds)
+        setPaused(!!h.paused)
         if (h.status === "disqualified") {
           setFatal("This attempt has been stopped. Speak to your invigilator.")
           clearInterval(tick); clearInterval(beat)
@@ -88,23 +96,24 @@ export default function ExamRunner({ token, onFinished }) {
       } catch { /* a dropped beat is not fatal, the next one will catch up */ }
     }, HEARTBEAT_MS)
     return () => { clearInterval(tick); clearInterval(beat) }
-  }, [paper, result, token, doSubmit])
+  }, [paper, result, token, doSubmit, paused])
 
-  // Local clock reaching zero submits without waiting for the next heartbeat
+  // Local clock reaching zero submits without waiting for the next heartbeat,
+  // unless the sitting is paused, where zero is not a real expiry.
   useEffect(() => {
-    if (remaining === 0 && paper && !result && !submittedRef.current) doSubmit(true)
-  }, [remaining, paper, result, doSubmit])
+    if (remaining === 0 && paper && !result && !paused && !submittedRef.current) doSubmit(true)
+  }, [remaining, paper, result, paused, doSubmit])
 
   // ── Autosave ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!paper || result) return
+    if (!paper || result || paused) return
     const t = setInterval(async () => {
       setSaving(true)
       try { await examSaveProgress(token, answersRef.current) } catch { /* retried next cycle */ }
       finally { setSaving(false) }
     }, AUTOSAVE_MS)
     return () => clearInterval(t)
-  }, [paper, result, token])
+  }, [paper, result, token, paused])
 
   // ── Invigilation ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -112,6 +121,9 @@ export default function ExamRunner({ token, onFinished }) {
 
     const onHide = async () => {
       if (document.visibilityState !== "hidden") return
+      // During a paused sitting looking away is legitimate, so it is not counted
+      // against the candidate.
+      if (paused) return
       // Save first: if they do not come back, their work is still banked
       examSaveProgress(token, answersRef.current).catch(() => {})
       const res = await examLogEvent(token, "tab_blur", { at: new Date().toISOString() })
@@ -154,7 +166,7 @@ export default function ExamRunner({ token, onFinished }) {
       document.removeEventListener("cut", onCopyPaste)
       window.removeEventListener("beforeunload", onBeforeUnload)
     }
-  }, [paper, result, token])
+  }, [paper, result, token, paused])
 
   useEffect(() => {
     if (!warning) return
@@ -229,10 +241,32 @@ export default function ExamRunner({ token, onFinished }) {
             <span className="text-xs" style={{ color: "#9FC0E0" }}>
               {answeredCount} of {questions.length} answered
             </span>
-            <TimeChip seconds={remaining} />
+            <TimeChip seconds={remaining} paused={paused} />
           </div>
         </div>
       </div>
+
+      {/* Invigilator has paused the sitting. The paper stays on screen but is
+          not answerable, and the clock is held. */}
+      {paused && (
+        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl p-7 max-w-sm w-full text-center">
+            <PauseIcon size={38} className="mx-auto mb-3" style={{ color: NAVY }} />
+            <h3 className="text-xl font-bold mb-2" style={{ color: NAVY }}>Your exam is paused</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Your invigilator has paused this sitting. Your work is saved and your time is being held.
+            </p>
+            <p className="text-sm font-semibold" style={{ color: MID }}>
+              Stay on this page. It will unlock the moment the exam resumes.
+            </p>
+            {remaining != null && (
+              <p className="text-xs text-gray-400 mt-3">
+                You have {Math.floor(remaining / 60)} minutes left when it restarts.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {warning && (
         <div className="sticky top-[60px] z-20 bg-amber-50 border-b border-amber-200">
@@ -406,8 +440,16 @@ export default function ExamRunner({ token, onFinished }) {
 
 // ── Bits ───────────────────────────────────────────────────────────────────
 
-function TimeChip({ seconds }) {
+function TimeChip({ seconds, paused }) {
   if (seconds == null) return null
+  if (paused) {
+    return (
+      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-sm"
+        style={{ backgroundColor: "#E8A020", color: "#FFFFFF" }}>
+        <PauseIcon size={13} /> Paused
+      </span>
+    )
+  }
   const low = seconds <= 300
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)

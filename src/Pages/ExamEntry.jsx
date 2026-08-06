@@ -17,8 +17,10 @@ export default function ExamEntry({ sessionCode, onAuthenticated }) {
     setError("")
     setBusy(true)
     try {
+      // The server returns mode 'exam' with a token, or mode 'results' with a
+      // score once the invigilator has published them.
       const res = await examLogin(sessionCode, accessCode.trim(), password.trim())
-      onAuthenticated(res.token)
+      onAuthenticated(res)
     } catch (err) {
       setError(err.message)
     } finally {
