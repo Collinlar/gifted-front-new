@@ -6,6 +6,7 @@ import Sidebar from "./Components/common/Sidebar";
 
 import OverviewPage from "./Pages/OverviewPage";
 import ExamPortal from "./Pages/ExamPortal";
+import VerifyCertificate from "./Pages/VerifyCertificate";
 import Tracks from "./Pages/Tracks";
 import TrackDetail from "./Pages/TrackDetail";
 import Community from "./Pages/Community";
@@ -170,6 +171,11 @@ function App() {
 				{/* Supervised exam sitting. Runs on the anon key through RPC only,
 				    so the answer key is never sent to the browser. */}
 				<Route element={<ExamPortal/>} path="/exam/:sessionCode"/>
+
+				{/* Public certificate check. No sign in, by design: the whole
+				    value of a serial is that a school or employer can verify it. */}
+				<Route element={<VerifyCertificate/>} path="/verify"/>
+				<Route element={<VerifyCertificate/>} path="/verify/:serial"/>
 
 				<Route element={<Question/>} path="/quiz-questions"/>
 				<Route element={<QuizOverview/>} path="/quiz-overview"/>
