@@ -162,6 +162,21 @@ export default function ClaimAccount() {
     setIsLoading(true)
 
     try {
+      // Refuse to claim anything that is not a genuine unclaimed legacy row.
+      // Claiming inserts a second users row for the same email and marks the
+      // first one taken, so running it against an ordinary account leaves the
+      // person with duplicates and no way in.
+      if (!foundUser?.mongo_id) {
+        setError("This account is already set up. Go back and sign in with your email and password.")
+        setIsLoading(false)
+        return
+      }
+      if (foundUser.claimed_by) {
+        setError("This account has already been claimed. Sign in with your email and password, or reset your password.")
+        setIsLoading(false)
+        return
+      }
+
       console.log("Step 1: creating auth user for", email)
 
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

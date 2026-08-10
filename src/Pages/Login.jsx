@@ -263,16 +263,25 @@ const Login = () => {
         navigate("/overview")
       }, 2000)
     } else {
-      // Check if this is a migrated user whose account hasn't been claimed yet
+      // Check if this is a migrated user whose account hasn't been claimed yet.
+      //
+      // "A users row exists for this email" is NOT that test. Signing up also
+      // creates a users row, so that check caught every new account: one wrong
+      // password and a brand new user was pushed into claiming an account they
+      // already owned, where the claim flow would try to register their email a
+      // second time and fail.
+      //
+      // A genuine migrated row is one carried over from MongoDB (it has a
+      // mongo_id) that nobody has claimed yet (claimed_by is still null).
       const isEmail = /\S+@\S+\.\S+/.test(formData.emailOrUsername)
       if (isEmail) {
         const { data: existingUser } = await supabase
           .from('users')
-          .select('email')
+          .select('email, mongo_id, claimed_by')
           .eq('email', formData.emailOrUsername)
-          .single()
+          .maybeSingle()
 
-        if (existingUser) {
+        if (existingUser?.mongo_id && !existingUser.claimed_by) {
           setMigratedEmail(formData.emailOrUsername)
           setIsLoading(false)
           return
