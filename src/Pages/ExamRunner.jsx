@@ -296,7 +296,13 @@ export default function ExamRunner({ token, onFinished }) {
           </div>
 
           {q.image && (
-            <img src={q.image} alt="" className="mb-4 w-full max-h-72 object-contain rounded-lg border border-gray-100" />
+            <figure className="mb-4">
+              <img src={q.image} alt={q.imageTitle || ""}
+                className="w-full max-h-72 object-contain rounded-lg border border-gray-100" />
+              {q.imageTitle && (
+                <figcaption className="text-center text-xs text-gray-500 mt-1.5">{q.imageTitle}</figcaption>
+              )}
+            </figure>
           )}
 
           <div className="text-[15px] leading-relaxed mb-5" style={{ color: "#1F2937" }}

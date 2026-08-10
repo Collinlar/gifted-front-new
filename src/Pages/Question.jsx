@@ -324,11 +324,18 @@ const QuizPage = () => {
               <div className="flex-1 bg-white rounded-xl shadow-lg border border-blue-100">
                 <div className="p-6 max-h-[75vh] overflow-y-auto">
                     {shuffledQuizData.questions[currentQuestion]?.image && (
-                      <img
-                        src={shuffledQuizData.questions[currentQuestion].image}
-                        alt="Question Visual"
-                        className="mb-4 w-full max-h-64 object-contain mx-auto rounded"
-                      />
+                      <figure className="mb-4">
+                        <img
+                          src={shuffledQuizData.questions[currentQuestion].image}
+                          alt={shuffledQuizData.questions[currentQuestion].imageTitle || "Question visual"}
+                          className="w-full max-h-64 object-contain mx-auto rounded"
+                        />
+                        {shuffledQuizData.questions[currentQuestion].imageTitle && (
+                          <figcaption className="text-center text-xs text-gray-500 mt-1.5">
+                            {shuffledQuizData.questions[currentQuestion].imageTitle}
+                          </figcaption>
+                        )}
+                      </figure>
                     )}
                     <h3 className="font-semibold text-blue-900 mb-4">
                       Q{currentQuestion + 1}:
