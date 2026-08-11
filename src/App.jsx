@@ -7,6 +7,8 @@ import Sidebar from "./Components/common/Sidebar";
 import OverviewPage from "./Pages/OverviewPage";
 import ExamPortal from "./Pages/ExamPortal";
 import VerifyCertificate from "./Pages/VerifyCertificate";
+import Home from "./Pages/Home";
+import Auth from "./Pages/Auth";
 import Tracks from "./Pages/Tracks";
 import TrackDetail from "./Pages/TrackDetail";
 import Community from "./Pages/Community";
@@ -142,7 +144,10 @@ function App() {
 			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard" || location.pathname=="/practice-overview" || location.pathname=="/practice")&&<Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
-				<Route index element={<LandingPages/>}/>
+				{/* Redesigned marketing and auth surfaces. The previous landing
+				    page stays reachable at /home-legacy until this is signed off. */}
+				<Route index element={<Home/>}/>
+				<Route element={<LandingPages/>} path="/home-legacy"/>
 				
 				<Route path='/overview' element={<OverviewPage competitions={competitions} />} />
 				<Route path='/tracks' element={<Tracks />} />
@@ -155,12 +160,14 @@ function App() {
 				<Route path='/invoice' element={<InvoiceList />} />
 				<Route path='/diagnostics' element={<Diagnostics />} />
 				<Route element={<Select competitionList={competitionList}/>} path='/purpose'/>
-				<Route element={<SignUp/>} path="/sign-up"/>
+				<Route element={<Auth/>} path="/sign-up"/>
+				<Route element={<SignUp/>} path="/sign-up-legacy"/>
 				<Route element={<SelectParent/>} path='/select-parent'/>
 				<Route element={<SelectStudent/>} path='/select-student'/>
 				<Route element={<SelectCategory/>} path="/select-category"/>
 				<Route element={<SelectHighSchool/>} path='/select-highschool'/>
-				<Route element={<Login/>} path="/login"/>
+				<Route element={<Auth/>} path="/login"/>
+				<Route element={<Login/>} path="/login-legacy"/>
 				
 				<Route element={<SelectPrimary/>} path='/select-primary'/>
 				<Route element={<InputSchool/>} path='/input-school'/>
