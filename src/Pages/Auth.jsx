@@ -95,10 +95,11 @@ export default function Auth() {
     if (busy) return
     setError(""); setBusy(true)
     try {
-      const isEmail = /\S+@\S+\.\S+/.test(signin.emailOrUsername)
+      const id = signin.emailOrUsername.trim()
+      const isEmail = /\S+@\S+\.\S+/.test(id)
       const res = await loginUser({
         password: signin.password,
-        ...(isEmail ? { email: signin.emailOrUsername } : { userName: signin.emailOrUsername }),
+        ...(isEmail ? { email: id } : { userName: id }),
       })
       if (res.success) navigate("/overview")
       else setError(res.message || "Incorrect email or password. Try again.")
@@ -128,13 +129,28 @@ export default function Auth() {
     try {
       const res = await registerUser({
         ...form,
+        email: String(form.email || "").trim(),
         category: role,
         School: form.school || "",
         // registerUser expects an array here, and it drives track assignment
         purposeOfRegistration: form.interest && form.interest !== "Undecided" ? [form.interest] : [],
       })
-      if (res.success) setStep(2)
-      else setError(res.message || "We could not create your account. Try again.")
+
+      if (res.success) {
+        // The account exists either way. needsSignIn means only the automatic
+        // session failed, so send them to the form rather than implying the
+        // signup itself did not work.
+        if (res.needsSignIn) {
+          setView("signin")
+          setStep(0)
+          setSignin({ emailOrUsername: res.email || form.email, password: "" })
+          setError(res.message)
+        } else {
+          setStep(2)
+        }
+      } else {
+        setError(res.message || "We could not create your account. Try again.")
+      }
     } catch {
       setError("We could not reach the server. Try again in a moment.")
     } finally {

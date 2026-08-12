@@ -44,7 +44,10 @@ export function getStoredProfile() {
 }
 
 export async function loginUser({ email, password, userName }) {
-  const loginEmail = email || userName
+  // Trim before authenticating. Supabase normalises the email itself, but a
+  // stray space that came in with a pasted address still has to be stripped on
+  // our side so it cannot differ from what was stored at signup.
+  const loginEmail = String(email || userName || '').trim()
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: loginEmail,
@@ -150,10 +153,48 @@ export async function registerUser(registerData) {
   const catVal    = category ?? Category ?? ''
   const schoolVal = school ?? School ?? ''
 
+  // The signup wizard carries these across several pages, so whitespace can be
+  // introduced anywhere along the way. Normalise here rather than trusting the
+  // caller, so the address stored at signup is the one that will match at login.
+  const cleanEmail = String(email || '').trim()
+  const cleanPassword = String(password || '')
+
+  if (!cleanEmail) {
+    return { success: false, message: 'We did not receive your email address. Start the signup again.' }
+  }
+  if (cleanPassword.length < 6) {
+    return { success: false, message: 'Your password needs at least 6 characters.' }
+  }
+
+  // Temporary diagnostic. Prints what actually arrived here after the multi
+  // page wizard, so a credential mangled in transit is visible. Logs the
+  // LENGTH and a short fingerprint, never the password itself. Remove once the
+  // signup issue is closed: set VITE_DEBUG_SIGNUP=false or delete this block.
+  if (import.meta.env.VITE_DEBUG_SIGNUP === 'true') {
+    const fp = await (async (s) => {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+      return Array.from(new Uint8Array(buf)).slice(0, 4)
+        .map((b) => b.toString(16).padStart(2, '0')).join('')
+    })(cleanPassword)
+
+    console.info('[signup] what reached registerUser:', {
+      email: cleanEmail,
+      emailHadWhitespace: String(email || '') !== cleanEmail,
+      passwordLength: cleanPassword.length,
+      passwordFingerprint: fp,
+      // If these differ, the wizard lost or replaced the password in transit
+      matchesConfirm: registerData.confirmPassword === undefined
+        ? 'not provided'
+        : String(registerData.confirmPassword) === cleanPassword,
+      category: catVal || '(empty)',
+      firstName: firstName || '(empty)',
+    })
+  }
+
   // Create auth user — email_confirm:true skips the confirmation email
   const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
+    email: cleanEmail,
+    password: cleanPassword,
     email_confirm: true,
     user_metadata: {
       first_name:        firstName  ?? '',
@@ -183,7 +224,7 @@ export async function registerUser(registerData) {
     id:                      authUser.id,
     first_name:              firstName    ?? '',
     last_name:               lastName     ?? '',
-    email:                   email        ?? '',
+    email:                   cleanEmail,
     mobile_number:           mobileNumber ?? '',
     date_of_birth:           dobVal,
     gender:                  gender       ?? '',
@@ -211,12 +252,22 @@ export async function registerUser(registerData) {
 
   // Sign in to get a live session/token
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
+    email: cleanEmail,
+    password: cleanPassword,
   })
 
   if (signInError) {
-    return { success: false, message: signInError.message }
+    // The account and profile both exist at this point, so do NOT delete them:
+    // the credentials are valid and the person can sign in from the login page.
+    // Reporting a bare failure here is what previously made this look like
+    // "signup did not work", sending people round to try again and hit
+    // "email already registered".
+    return {
+      success: true,
+      needsSignIn: true,
+      email: cleanEmail,
+      message: 'Your account is ready. Sign in with the email and password you just chose.',
+    }
   }
 
   const token = signInData.session.access_token
