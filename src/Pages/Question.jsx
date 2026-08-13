@@ -33,6 +33,7 @@ const QuizPage = () => {
   const [quizFinished, setQuizFinished] = useState(false);
   const [postQuizTab, setPostQuizTab] = useState("summary"); // "summary" | "analytics" | "review"
   const [feedback, setFeedback] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   // track context threaded from TrackDetail via QuizOverview
   const trackSlug = location.state?.trackSlug || localStorage.getItem("quiz-track-slug");
@@ -161,16 +162,17 @@ const QuizPage = () => {
 
   const handleFeedBackSubmit = async (e) => {
     e.preventDefault();
-    if (feedback.trim()) {
-      const quiz = shuffledQuizData.title
-      
-      console.log(quiz)
-      await sendFeedback({ quiz, feedback })
-      alert("Feedback submitted, thank you!");
-      setFeedback("");
-      navigate("/overview");
-
+    if (!feedback.trim()) return;
+    try {
+      await sendFeedback({ quiz: shuffledQuizData.title, feedback });
+    } catch (err) {
+      console.error("Could not send feedback:", err);
     }
+    // Acknowledge in place. Previously this fired an alert and then navigated
+    // away to the dashboard, which threw the student off their results page for
+    // leaving an optional comment.
+    setFeedbackSent(true);
+    setFeedback("");
   };
 
   const handleScoreSubmit = async (id) => {
@@ -493,21 +495,21 @@ const QuizPage = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="mb-6 py-8">
-                      <p className="text-xl font-semibold text-blue-900 mb-2">Quiz Completed</p>
-                      <p className="text-gray-500">Results will be released in due time.</p>
+                    <div className="mb-7 py-8">
+                      <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-blue-50">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth="2.2"
+                          strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </div>
+                      <p className="text-xl font-semibold text-blue-900 mb-1.5">Your answers are in</p>
+                      <p className="text-gray-500 text-sm max-w-sm mx-auto leading-relaxed">
+                        Marks for this assessment are released by your instructor. You will see
+                        them here once they are out.
+                      </p>
                     </div>
                   )}
 
-                  <p className="text-gray-600 mb-1">
-                    Congratulations{" "}
-                    <span className="font-semibold text-blue-900">
-                      {jwtDecode(localStorage.getItem("token")).firstName}{" "}
-                      {jwtDecode(localStorage.getItem("token")).lastName}
-                    </span>
-                  </p>
                   <p className="text-gray-500 mb-8 text-sm">
-                    You completed <span className="font-medium">{shuffledQuizData.title}</span>
+                    You completed <span className="font-medium text-blue-900">{shuffledQuizData.title}</span>
                   </p>
 
                   {/* Navigation */}
@@ -535,27 +537,44 @@ const QuizPage = () => {
                     </button>
                   </div>
 
-                  {/* Feedback form */}
-                  <div className="border-t border-gray-100 pt-6 max-w-lg mx-auto text-left">
-                    <label className="block mb-2 text-sm font-medium text-blue-800">
-                      Share your feedback on this quiz
-                    </label>
-                    <form onSubmit={handleFeedBackSubmit}>
-                      <textarea
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        rows="3"
-                        className="w-full p-3 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-none"
-                        placeholder="Let us know what you think..."
-                      />
-                      <button
-                        type="submit"
-                        className="mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium text-sm"
-                      >
-                        Submit feedback
-                      </button>
-                    </form>
-                  </div>
+                  {/* Feedback, only when the assessment asked for it.
+                      This used to render on every quiz whether or not the admin
+                      had switched it on, so the same prompt followed every paper. */}
+                  {shuffledQuizData.showFeedbackForm && (
+                    <div className="border-t border-gray-100 pt-6 max-w-lg mx-auto text-left">
+                      {feedbackSent ? (
+                        <p className="text-sm text-center text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg py-3">
+                          Thank you, your feedback has been sent.
+                        </p>
+                      ) : (
+                        <>
+                          <label htmlFor="quiz-feedback" className="block mb-1 text-sm font-medium text-blue-900">
+                            How did you find this assessment?
+                          </label>
+                          <p className="text-xs text-gray-500 mb-2.5">
+                            Optional, and only seen by the team who set it.
+                          </p>
+                          <form onSubmit={handleFeedBackSubmit}>
+                            <textarea
+                              id="quiz-feedback"
+                              value={feedback}
+                              onChange={(e) => setFeedback(e.target.value)}
+                              rows="3"
+                              className="w-full p-3 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-none"
+                              placeholder="Anything that was unclear, too long, or worth keeping?"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!feedback.trim()}
+                              className="mt-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg font-medium text-sm"
+                            >
+                              Send feedback
+                            </button>
+                          </form>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

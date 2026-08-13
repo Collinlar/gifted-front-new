@@ -341,6 +341,33 @@ export async function fetchCourseReview(userId, courseId) {
 
 // ─── Assessments / Exams ───────────────────────────────────────────────────────
 
+// Supabase hands back the raw column names, but the pages read camelCase. Every
+// exam row must pass through here or the admin's settings are silently ignored:
+// an undefined `displayScores` is falsy, so a quiz configured to show marks
+// simply would not, with nothing anywhere to say why.
+//
+// The snake_case keys are kept alongside, because TrackDetail and others still
+// read those.
+export function normalizeExam(e) {
+  if (!e) return e
+  return {
+    ...e,
+    numberOfQuestions: e.number_of_questions ?? e.numberOfQuestions,
+    attemptsAllowed:   e.attempts_allowed    ?? e.attemptsAllowed   ?? 0,
+    allowQuizReview:   e.allow_quiz_review   ?? e.allowQuizReview   ?? false,
+    displayScores:     e.display_scores      ?? e.displayScores     ?? true,
+    showFeedbackForm:  e.show_feedback_form  ?? e.showFeedbackForm  ?? false,
+    shuffleQuestions:  e.shuffle_questions   ?? e.shuffleQuestions  ?? false,
+    hintsEnabled:      e.hints_enabled       ?? e.hintsEnabled      ?? true,
+    // Stored as jsonb/text[]; the pages want a plain array of strings
+    instructions: Array.isArray(e.instructions)
+      ? e.instructions.filter(Boolean)
+      : e.instructions
+        ? [String(e.instructions)]
+        : [],
+  }
+}
+
 export async function getAllExams() {
   const { data, error } = await supabaseAdmin
     .from('exams')
@@ -348,7 +375,7 @@ export async function getAllExams() {
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return { success: true, exams: data }
+  return { success: true, exams: (data || []).map(normalizeExam) }
 }
 
 export async function getExam(id) {
@@ -359,7 +386,7 @@ export async function getExam(id) {
     .single()
 
   if (error) throw error
-  return { success: true, exam: data }
+  return { success: true, exam: normalizeExam(data) }
 }
 
 export async function getFeaturedExams() {
@@ -370,7 +397,7 @@ export async function getFeaturedExams() {
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return { success: true, exams: data }
+  return { success: true, exams: (data || []).map(normalizeExam) }
 }
 
 export async function getAssessment(name, grade) {
@@ -1045,19 +1072,7 @@ export async function getTrackContent(trackId) {
     return acc
   }, {})
 
-  // Normalize a raw Supabase exam row so snake_case columns are available as
-  // camelCase — the pages (Question.jsx, QuizOverview.jsx) expect camelCase.
-  // Keep the snake_case keys too so TrackDetail.jsx's existing reads still work.
-  const normalizeExam = (e) => ({
-    ...e,
-    numberOfQuestions:  e.number_of_questions  ?? e.numberOfQuestions,
-    attemptsAllowed:    e.attempts_allowed      ?? e.attemptsAllowed     ?? 0,
-    allowQuizReview:    e.allow_quiz_review     ?? e.allowQuizReview     ?? false,
-    displayScores:      e.display_scores        ?? e.displayScores       ?? true,
-    showFeedbackForm:   e.show_feedback_form    ?? e.showFeedbackForm    ?? false,
-    shuffleQuestions:   e.shuffle_questions     ?? e.shuffleQuestions    ?? false,
-    hintsEnabled:       e.hints_enabled         ?? e.hintsEnabled        ?? true,
-  })
+  // normalizeExam is defined once at module scope, above.
 
   const [competitions, courses, exams, camps, flashcards] = await Promise.all([
     idsByType.competition?.length

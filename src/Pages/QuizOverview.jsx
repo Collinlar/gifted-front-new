@@ -1,176 +1,209 @@
 import { getTokenUserId } from "../lib/auth";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchQuizReview } from "../lib/api";
-import {jwtDecode} from "jwt-decode";
+import {
+  ArrowLeft, Clock, ListChecks, RotateCcw, CheckCircle2,
+  AlertTriangle, Play, Info,
+} from "lucide-react";
+
+const NAVY = "#003366";
+const MID  = "#336699";
+
+// Shown only when the assessment carries no instructions of its own. Previously
+// this list rendered on every quiz regardless, alongside whatever the admin had
+// written, so every paper appeared to have the same three rules.
+const FALLBACK_INSTRUCTIONS = [
+  "Make sure you have a stable internet connection before you begin.",
+  "Once you move on, you cannot return to a previous question.",
+  "Your answers are saved as you go.",
+];
 
 export default function QuizOverview() {
-  const [quizStarted, setQuizStarted] = useState(false);
   const [quizReview, setQuizReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [isDescriptionOverflowing, setIsDescriptionOverflowing] = useState(false);
-  const descriptionRef = useRef(null);
+
   const navigate = useNavigate();
   const location = useLocation();
-  const quizData = location.state.questions;
-  const quizId = quizData._id || quizData.id;
+
+  const quizData  = location.state?.questions || {};
+  const quizId    = quizData._id || quizData.id;
   const trackSlug = location.state?.trackSlug;
   const trackName = location.state?.trackName;
-  const userName = localStorage.getItem("examName");
+  const userName  = localStorage.getItem("examName");
 
   useEffect(() => {
-    const fetchAssessment = async () => {
+    const load = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const userId = getTokenUserId();
-        const response = await fetchQuizReview(userId, quizId);
-        const review = response.review || {attemptsMade:0};
-        setQuizReview(review);
-        
-      } catch (error) {
-        console.error("Error fetching quiz review:", error);
+        if (!localStorage.getItem("token")) return;
+        const res = await fetchQuizReview(getTokenUserId(), quizId);
+        setQuizReview(res.review || { attemptsMade: 0 });
+      } catch (err) {
+        console.error("Could not load your attempt history:", err);
+        setQuizReview({ attemptsMade: 0 });
       } finally {
         setLoading(false);
       }
     };
-
-    if (quizId) fetchAssessment();
+    if (quizId) load(); else setLoading(false);
   }, [quizId]);
 
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (!descriptionRef.current) return;
-      const el = descriptionRef.current;
-      const isOverflow = el.scrollHeight > el.clientHeight + 1; // tolerance for sub-pixel
-      setIsDescriptionOverflowing(isOverflow);
-    };
-
-    // Run after first render and whenever description toggles
-    checkOverflow();
-
-    // Recalculate on resize
-    window.addEventListener("resize", checkOverflow);
-    return () => window.removeEventListener("resize", checkOverflow);
-  }, [showFullDescription, quizData?.description]);
-
-  const startQuiz = () => {
-    setQuizStarted(true);
+  const startQuiz = () =>
     navigate("/quiz-questions", { state: { questions: quizData, trackSlug, trackName } });
-  };
 
-  const Card = ({ children }) => (
-    <div className="w-full shadow-2xl rounded-3xl bg-white p-8 text-gray-900">{children}</div>
-  );
-
-  const Button = ({ children, onClick }) => (
-    <button
-      onClick={onClick}
-      className="bg-green-500 hover:bg-green-600 text-white font-bold text-lg py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105"
-    >
-      {children}
-    </button>
-  );
-
-  if (loading || !quizReview) {
-    return <div className="text-white text-center mt-10 text-xl">Loading quiz details...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ backgroundColor: "#F0F4F8" }}>
+        <p className="text-sm" style={{ color: MID }}>Loading this assessment...</p>
+      </div>
+    );
   }
 
-  const attemptsExhausted = quizReview.attemptsMade >= quizData.attemptsAllowed;
+  const attemptsMade  = quizReview?.attemptsMade ?? 0;
+  const attemptsLimit = Number(quizData.attemptsAllowed) || 0;
+  // 0 or missing means the admin did not cap attempts
+  const attemptsExhausted = attemptsLimit > 0 && attemptsMade >= attemptsLimit;
+
+  const questionCount = quizData.questions?.length ?? quizData.numberOfQuestions ?? 0;
+  const instructions  = Array.isArray(quizData.instructions)
+    ? quizData.instructions.filter(Boolean)
+    : [];
+  const shownInstructions = instructions.length ? instructions : FALLBACK_INSTRUCTIONS;
+
+  const description = String(quizData.description || "").trim();
+  const isLong = description.length > 320;
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-blue-500 to-indigo-600 p-6 w-full text-white">
+    <div className="min-h-screen w-full py-8 px-4" style={{ backgroundColor: "#F0F4F8" }}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-3xl"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="max-w-3xl mx-auto"
       >
-        <Card>
-          {userName && (
-            <div className="text-center mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">Welcome, <span className="font-black">{userName}</span>!</h1>
-            </div>
-          )}
-          <h2 className="text-3xl font-bold mb-4 text-center">{quizData.title}</h2>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-sm font-medium mb-5 hover:opacity-80"
+          style={{ color: MID }}
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
 
-          {quizData.description && (
-            <div className="mb-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description:</h3>
-              <div className="text-gray-700 leading-relaxed">
-                <div className="relative">
-                  <div
-                    ref={descriptionRef}
-                    className={showFullDescription ? "whitespace-pre-wrap" : "whitespace-pre-wrap overflow-hidden"}
-                    style={showFullDescription ? undefined : { maxHeight: "12rem" }}
-                  >
-                    {quizData.description}
-                  </div>
-                  {!showFullDescription && isDescriptionOverflowing && (
-                    <div
-                      className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
-                      style={{
-                        background:
-                          "linear-gradient(to bottom, rgba(249,250,251,0), rgba(249,250,251,1))" // from transparent to bg-gray-50
-                      }}
-                    />
-                  )}
-                </div>
-                {isDescriptionOverflowing && (
-                  <button
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-3 text-blue-600 hover:text-blue-800 font-medium text-sm underline transition-colors"
-                  >
-                    {showFullDescription ? "Show less" : "See more"}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-6 space-y-2 text-gray-800">
-            <p><strong>Number of Questions:</strong> {quizData.questions.length}</p>
-            <p><strong>Attempts Allowed:</strong> {quizData.attemptsAllowed}</p>
-            <p><strong>Time Limit:</strong> {quizData.time} minutes</p>
-            <p><strong>Attempts Made:</strong> {quizReview.attemptsMade}</p>
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 sm:px-8 pt-7 pb-6 border-b border-gray-100">
+            {userName && (
+              <p className="text-sm mb-1" style={{ color: MID }}>Welcome, {userName}</p>
+            )}
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight" style={{ color: NAVY }}>
+              {quizData.title}
+            </h1>
+            {trackName && (
+              <p className="text-xs mt-2 uppercase tracking-wide" style={{ color: MID }}>{trackName}</p>
+            )}
           </div>
 
-          {quizData.instructions && quizData.instructions.length > 0 && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Instructions:</h3>
-              <div className="text-blue-800 whitespace-pre-wrap">{quizData.instructions}</div>
+          {/* Facts. Only what is actually configured, so a blank value can no
+              longer appear next to a label the way "Attempts Allowed:" did. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+            <Fact icon={ListChecks} label="Questions" value={questionCount || "—"} />
+            <Fact icon={Clock} label="Time limit"
+              value={quizData.time ? `${quizData.time} min` : "No limit"} />
+            <Fact icon={RotateCcw} label="Attempts"
+              value={attemptsLimit > 0 ? `${attemptsMade} of ${attemptsLimit}` : `${attemptsMade} made`} />
+            <Fact icon={CheckCircle2} label="Marks shown"
+              value={quizData.displayScores ? "Right away" : "Later"} />
+          </div>
+
+          {/* Description */}
+          {description && (
+            <div className="px-6 sm:px-8 py-6 border-b border-gray-100">
+              <h2 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: MID }}>
+                About this assessment
+              </h2>
+              <div
+                className="text-[15px] leading-relaxed whitespace-pre-line"
+                style={{ color: "#374151" }}
+              >
+                {isLong && !showFullDescription
+                  ? description.slice(0, 320).trimEnd() + "…"
+                  : description}
+              </div>
+              {isLong && (
+                <button
+                  onClick={() => setShowFullDescription((v) => !v)}
+                  className="mt-3 text-sm font-semibold hover:underline"
+                  style={{ color: MID }}
+                >
+                  {showFullDescription ? "Show less" : "Read the full description"}
+                </button>
+              )}
             </div>
           )}
 
-          {attemptsExhausted && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="bg-red-100 text-red-700 p-4 rounded-md mb-6 shadow-md"
-            >
-              <strong>Warning:</strong> You have exhausted all your attempts for this quiz.
-            </motion.div>
-          )}
+          {/* Instructions */}
+          <div className="px-6 sm:px-8 py-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: MID }}>
+              <Info size={13} /> Before you begin
+            </h2>
+            <ul className="space-y-2.5">
+              {shownInstructions.map((line, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span
+                    className="shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold"
+                    style={{ backgroundColor: "#E6F0F9", color: NAVY }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-[15px] leading-relaxed" style={{ color: "#374151" }}>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-          {!attemptsExhausted && !quizStarted && (
-            <div className="mt-4 text-center">
-              <p className="text-gray-700 mb-4">
-                Please read the instructions carefully before you begin:
-              </p>
-              <ul className="list-disc list-inside text-gray-700 mb-6">
-                <li>Ensure a stable internet connection.</li>
-                <li>You cannot go back to previous questions.</li>
-                <li>Each question has a time limit.</li>
-              </ul>
-              <Button onClick={startQuiz}>Start Quiz</Button>
-            </div>
-          )}
-        </Card>
+          {/* Action */}
+          <div className="px-6 sm:px-8 py-6 bg-gray-50 border-t border-gray-100">
+            {attemptsExhausted ? (
+              <div className="flex items-start gap-3 rounded-xl px-4 py-3.5 bg-red-50 border border-red-200">
+                <AlertTriangle size={17} className="text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-800">You have used all your attempts</p>
+                  <p className="text-sm text-red-700 mt-0.5">
+                    This assessment allows {attemptsLimit} attempt{attemptsLimit === 1 ? "" : "s"} and you have made {attemptsMade}.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={startQuiz}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-white font-semibold transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: NAVY }}
+                >
+                  <Play size={16} /> Start assessment
+                </button>
+                <p className="text-xs mt-3" style={{ color: MID }}>
+                  {quizData.time
+                    ? `Your ${quizData.time} minute timer starts as soon as you begin.`
+                    : "There is no time limit on this assessment."}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       </motion.div>
+    </div>
+  );
+}
+
+function Fact({ icon: Icon, label, value }) {
+  return (
+    <div className="px-4 py-4 text-center">
+      <Icon size={15} className="mx-auto mb-1.5" style={{ color: MID }} />
+      <p className="text-base font-bold leading-none" style={{ color: NAVY }}>{value}</p>
+      <p className="text-[11px] mt-1.5 uppercase tracking-wide" style={{ color: MID }}>{label}</p>
     </div>
   );
 }
