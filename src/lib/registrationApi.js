@@ -22,11 +22,17 @@ export async function getOpenForms() {
   return { forms: data || [] }
 }
 
-export async function getForm(formId) {
-  const { data, error } = await supabase
-    .from('registration_forms').select('*').eq('id', formId).maybeSingle()
-  if (error) throw error
-  return { form: data }
+/**
+ * Resolve a shareable slug like KMAC26, or a uuid, to the form itself.
+ *
+ * Goes through an RPC rather than a plain select because RLS hides anything not
+ * open, which makes a draft form and a mistyped link look identical. The RPC
+ * can tell them apart and say which it is.
+ */
+export async function getForm(slugOrId) {
+  const res = unwrap(await supabase.rpc('resolve_registration_form', { p_slug: String(slugOrId) }))
+  if (!res?.found) throw new Error(res?.error || 'That registration is not available.')
+  return { form: res.form }
 }
 
 /**

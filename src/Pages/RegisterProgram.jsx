@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { usePaystackPayment } from "react-paystack"
 import {
-  ArrowLeft, CheckCircle2, Sparkles, AlertCircle, Loader2, CreditCard, Clock,
+  ArrowLeft, CheckCircle2, AlertCircle, Loader2, CreditCard, Clock,
 } from "lucide-react"
 import {
   getForm, getPrefill, submitRegistration, saveDraft, markPaid,
@@ -14,7 +14,9 @@ const NAVY = "#003366"
 const MID  = "#336699"
 
 export default function RegisterProgram() {
-  const { formId } = useParams()
+  // The URL carries a shareable slug such as KMAC26. Everything downstream
+  // needs the form's real id, so resolve once and use form.id from then on.
+  const { formId: slug } = useParams()
   const navigate = useNavigate()
 
   const [form, setForm]       = useState(null)
@@ -32,9 +34,12 @@ export default function RegisterProgram() {
     let alive = true
     ;(async () => {
       try {
-        const [{ form: f }, ctx] = await Promise.all([getForm(formId), getPrefill(formId)])
+        const { form: f } = await getForm(slug)
         if (!alive) return
         if (!f) { setError("That registration form is not available."); return }
+
+        const ctx = await getPrefill(f.id)
+        if (!alive) return
 
         setForm(f)
         setContext(ctx)
@@ -60,7 +65,7 @@ export default function RegisterProgram() {
       }
     })()
     return () => { alive = false }
-  }, [formId])
+  }, [slug])
 
   const fields = useMemo(
     () => (form?.fields || []).filter((f) => f.key || f.type === "section" || f.type === "info"),
@@ -79,8 +84,8 @@ export default function RegisterProgram() {
   const set = (key, v) => { setValues((p) => ({ ...p, [key]: v })); setError("") }
 
   const stash = async () => {
-    if (!userId) return
-    try { await saveDraft(formId, userId, values); setSavedAt(new Date().toLocaleTimeString()) }
+    if (!userId || !form) return
+    try { await saveDraft(form.id, userId, values); setSavedAt(new Date().toLocaleTimeString()) }
     catch { /* a failed draft save is not worth interrupting them for */ }
   }
 
@@ -99,7 +104,7 @@ export default function RegisterProgram() {
 
     setBusy(true); setError("")
     try {
-      setResult(await submitRegistration(formId, values))
+      setResult(await submitRegistration(form.id, values))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -127,6 +132,7 @@ export default function RegisterProgram() {
   }
 
   const autoCount = fields.filter((f) => prefillReason(f, context)).length
+  const accent = form.accent_color || NAVY
 
   return (
     <div className="min-h-screen w-full py-8 px-4" style={{ backgroundColor: "#F0F4F8" }}>
@@ -136,11 +142,20 @@ export default function RegisterProgram() {
         </button>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {form.cover_image_url && (
+            <img src={form.cover_image_url} alt=""
+              className="w-full h-40 sm:h-52 object-cover"
+              onError={(e) => { e.target.style.display = "none" }} />
+          )}
+          <div className="h-1.5" style={{ backgroundColor: accent }} />
+
           <div className="px-6 sm:px-8 pt-7 pb-5 border-b border-gray-100">
             {form.program_title && (
-              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: MID }}>{form.program_title}</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: accent }}>{form.program_title}</p>
             )}
-            <h1 className="text-2xl font-bold leading-tight" style={{ color: NAVY }}>{form.title}</h1>
+            <h1 className="text-2xl font-bold leading-tight" style={{ color: NAVY }}>
+              {form.intro_heading || form.title}
+            </h1>
             {form.description && (
               <p className="text-[15px] leading-relaxed mt-3 whitespace-pre-line" style={{ color: "#374151" }}>
                 {form.description}
@@ -163,7 +178,6 @@ export default function RegisterProgram() {
 
           {autoCount > 0 && (
             <div className="px-6 sm:px-8 py-3 bg-emerald-50 border-b border-emerald-100 flex items-start gap-2">
-              <Sparkles size={15} className="text-emerald-600 shrink-0 mt-0.5" />
               <p className="text-sm text-emerald-800">
                 We have filled in {autoCount} answer{autoCount === 1 ? "" : "s"} from what you have
                 already told us. Check they are right and change anything that has moved on.
@@ -186,7 +200,7 @@ export default function RegisterProgram() {
             <div className="mt-7 pt-5 border-t border-gray-100 flex items-center gap-3 flex-wrap">
               <button type="submit" disabled={busy}
                 className="px-7 py-3 rounded-xl text-white font-semibold disabled:opacity-60"
-                style={{ backgroundColor: NAVY }}>
+                style={{ backgroundColor: accent }}>
                 {busy ? "Sending your registration..." : "Complete registration"}
               </button>
               <button type="button" onClick={stash}
