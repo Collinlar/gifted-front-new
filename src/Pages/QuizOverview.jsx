@@ -2,7 +2,7 @@ import { getTokenUserId } from "../lib/auth";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchQuizReview } from "../lib/api";
+import { fetchQuizReview, getExam } from "../lib/api";
 import {
   ArrowLeft, Clock, ListChecks, RotateCcw, CheckCircle2,
   AlertTriangle, Play, Info,
@@ -28,26 +28,44 @@ export default function QuizOverview() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const quizData  = location.state?.questions || {};
-  const quizId    = quizData._id || quizData.id;
+  // The object handed over in router state is whatever the list held when it
+  // was last fetched, which can be minutes or hours old. Treat it as a first
+  // paint only and refetch the assessment by id, so an edit made in admin shows
+  // up without the student having to reload the page they came from.
+  const passedQuiz = location.state?.questions || {};
+  const [quizData, setQuizData] = useState(passedQuiz);
+  const quizId = passedQuiz._id || passedQuiz.id;
   const trackSlug = location.state?.trackSlug;
   const trackName = location.state?.trackName;
   const userName  = localStorage.getItem("examName");
 
   useEffect(() => {
+    let alive = true;
+
     const load = async () => {
-      try {
-        if (!localStorage.getItem("token")) return;
-        const res = await fetchQuizReview(getTokenUserId(), quizId);
-        setQuizReview(res.review || { attemptsMade: 0 });
-      } catch (err) {
-        console.error("Could not load your attempt history:", err);
-        setQuizReview({ attemptsMade: 0 });
-      } finally {
-        setLoading(false);
-      }
+      // Refresh the assessment and the attempt history together
+      const [fresh, review] = await Promise.allSettled([
+        getExam(quizId),
+        localStorage.getItem("token")
+          ? fetchQuizReview(getTokenUserId(), quizId)
+          : Promise.resolve({ review: { attemptsMade: 0 } }),
+      ]);
+
+      if (!alive) return;
+
+      // Keep the passed object if the refetch fails, so a network blip shows a
+      // slightly stale page rather than nothing at all.
+      if (fresh.status === "fulfilled" && fresh.value?.exam) setQuizData(fresh.value.exam);
+      else if (fresh.status === "rejected") console.error("Could not refresh this assessment:", fresh.reason);
+
+      setQuizReview(
+        review.status === "fulfilled" ? review.value.review || { attemptsMade: 0 } : { attemptsMade: 0 }
+      );
+      setLoading(false);
     };
+
     if (quizId) load(); else setLoading(false);
+    return () => { alive = false };
   }, [quizId]);
 
   const startQuiz = () =>
