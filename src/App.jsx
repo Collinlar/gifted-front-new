@@ -9,6 +9,8 @@ import ExamPortal from "./Pages/ExamPortal";
 import VerifyCertificate from "./Pages/VerifyCertificate";
 import Home from "./Pages/Home";
 import Auth from "./Pages/Auth";
+import RegisterProgram from "./Pages/RegisterProgram";
+import MyRegistrations from "./Pages/MyRegistrations";
 import Tracks from "./Pages/Tracks";
 import TrackDetail from "./Pages/TrackDetail";
 import Community from "./Pages/Community";
@@ -141,7 +143,7 @@ function App() {
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard" || location.pathname=="/practice-overview" || location.pathname=="/practice")&&<Sidebar className="overflow-y-hidden" />}
+			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard" || location.pathname=="/practice-overview" || location.pathname=="/practice" || location.pathname=="/my-registrations")&&<Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				{/* Redesigned marketing and auth surfaces. The previous landing
@@ -177,6 +179,10 @@ function App() {
 
 				{/* Supervised exam sitting. Runs on the anon key through RPC only,
 				    so the answer key is never sent to the browser. */}
+				{/* Programme registration, replacing the Google Forms */}
+				<Route element={<RegisterProgram/>} path="/register/:formId"/>
+				<Route element={<MyRegistrations/>} path="/my-registrations"/>
+
 				<Route element={<ExamPortal/>} path="/exam/:sessionCode"/>
 
 				{/* Public certificate check. No sign in, by design: the whole
