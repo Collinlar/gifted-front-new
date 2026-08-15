@@ -74,13 +74,34 @@ export async function getMyRegistrations() {
   return { registrations: data || [] }
 }
 
+/**
+ * Record a card payment the student just made.
+ *
+ * Goes through an RPC rather than a direct update: the row-level policy lets a
+ * student edit their own submission while it is in play, and payment fields
+ * should not be part of that. This narrows them to exactly one transition,
+ * pending to paid.
+ */
 export async function markPaid(registrationId, reference) {
-  const { error } = await supabase
-    .from('registrations')
-    .update({ payment_status: 'paid', payment_reference: reference, updated_at: new Date().toISOString() })
-    .eq('id', registrationId)
-  if (error) throw error
-  return { ok: true }
+  return unwrap(await supabase.rpc('confirm_my_payment', {
+    p_registration_id: registrationId,
+    p_reference: reference || null,
+  }))
+}
+
+/** Only the programmes this student's grade is meant to see. */
+export async function getOpenFormsForMe(grade) {
+  const { forms } = await getOpenForms()
+  const g = String(grade || '').trim()
+  return {
+    forms: forms.filter((f) => {
+      const targets = f.target_grades || []
+      // No targeting means everyone. Targeting with no grade on file also shows
+      // it, since hiding a programme from someone whose profile is incomplete
+      // is worse than showing one they might not need.
+      return targets.length === 0 || !g || targets.includes(g)
+    }),
+  }
 }
 
 /**

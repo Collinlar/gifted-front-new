@@ -4,7 +4,8 @@ import {
   ClipboardList, Clock, CheckCircle2, XCircle, CreditCard,
   ArrowRight, AlertCircle, Hourglass,
 } from "lucide-react"
-import { getMyRegistrations, getOpenForms } from "../lib/registrationApi"
+import { usePaystackPayment } from "react-paystack"
+import { getMyRegistrations, getOpenFormsForMe, markPaid } from "../lib/registrationApi"
 
 const NAVY = "#003366"
 const MID  = "#336699"
@@ -49,11 +50,18 @@ export default function MyRegistrations() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
+  const [nonce, setNonce] = useState(0)
+  const reload = () => setNonce((n) => n + 1)
+
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
-        const [mine, forms] = await Promise.all([getMyRegistrations(), getOpenForms()])
+        const profile = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") } catch { return {} } })()
+        const [mine, forms] = await Promise.all([
+          getMyRegistrations(),
+          getOpenFormsForMe(profile.grade || profile.Grade),
+        ])
         if (!alive) return
         setRegs(mine.registrations)
         setOpen(forms.forms)
@@ -64,7 +72,7 @@ export default function MyRegistrations() {
       }
     })()
     return () => { alive = false }
-  }, [])
+  }, [nonce])
 
   // Anything open they have not already entered
   const registeredIds = new Set(regs.map((r) => r.form_id))
@@ -142,12 +150,7 @@ export default function MyRegistrations() {
                     <p className="text-sm mt-2.5" style={{ color: "#4B5563" }}>{meta.line}</p>
 
                     {r.payment_status === "pending" && (
-                      <div className="mt-3 flex items-center gap-2 text-sm rounded-lg px-3 py-2 bg-amber-50 border border-amber-200">
-                        <CreditCard size={14} className="text-amber-600 shrink-0" />
-                        <span className="text-amber-800">
-                          {form.fee_currency || "GHS"} {r.amount} still to pay
-                        </span>
-                      </div>
+                      <PayRow registration={r} form={form} onPaid={reload} />
                     )}
 
                     {r.status === "draft" && (
@@ -171,7 +174,7 @@ export default function MyRegistrations() {
             </h2>
             <div className="space-y-2">
               {available.map((f) => (
-                <button key={f.id} onClick={() => navigate(`/register/${f.id}`)}
+                <button key={f.id} onClick={() => navigate(`/register/${f.slug || f.id}`)}
                   className="w-full bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md transition-shadow flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-semibold" style={{ color: NAVY }}>{f.title}</p>
@@ -189,6 +192,64 @@ export default function MyRegistrations() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Paying what is owed ────────────────────────────────────────────────────
+//
+// Payment used to be offered only on the confirmation screen, so anyone who
+// navigated away had no route back to it. This is that route.
+
+function PayRow({ registration: r, form, onPaid }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+  const key = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY
+  const profile = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") } catch { return {} } })()
+
+  const initialise = usePaystackPayment({
+    publicKey: key || "",
+    email: profile.email || "",
+    amount: Math.round(Number(r.amount || 0) * 100),   // Paystack works in the minor unit
+    currency: form.fee_currency || "GHS",
+    reference: `${r.reference || "REG"}-${Date.now()}`,
+  })
+
+  return (
+    <div className="mt-3 rounded-lg px-3 py-2.5 bg-amber-50 border border-amber-200">
+      <div className="flex items-center gap-2 mb-2">
+        <CreditCard size={14} className="text-amber-600 shrink-0" />
+        <span className="text-sm text-amber-800">
+          {form.fee_currency || "GHS"} {r.amount} still to pay
+        </span>
+      </div>
+
+      {key ? (
+        <button
+          disabled={busy}
+          onClick={() => {
+            setError(""); setBusy(true)
+            initialise({
+              onSuccess: async (ref) => {
+                try { await markPaid(r.id, ref.reference || ref.trxref); onPaid() }
+                catch { setError("Payment went through but we could not record it. Contact us with your reference.") }
+                finally { setBusy(false) }
+              },
+              onClose: () => setBusy(false),
+            })
+          }}
+          className="text-sm font-semibold px-4 py-2 rounded-lg text-white disabled:opacity-60"
+          style={{ backgroundColor: "#1D9E75" }}
+        >
+          {busy ? "Opening payment..." : `Pay ${form.fee_currency || "GHS"} ${r.amount}`}
+        </button>
+      ) : (
+        <p className="text-xs text-amber-800">
+          Your place is held. We will send you payment details.
+        </p>
+      )}
+
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
     </div>
   )
 }

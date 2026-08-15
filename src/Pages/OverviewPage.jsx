@@ -14,6 +14,7 @@ import { getQuizDetails, getAllLearningResourceAnalytics, getUserDetails, getUse
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { jwtDecode } from "jwt-decode";
 import AnnouncementsSection from "./AnnouncementsSection";
+import OpenRegistrations from "./OpenRegistrations";
 
 // Brand colors
 const brandColors = {
@@ -443,6 +444,10 @@ const OverviewPage = () => {
 
         {/* Announcements */}
         <AnnouncementsSection />
+
+        {/* Programmes currently taking entries. Renders nothing when there is
+            nothing open, so it never becomes permanent dashboard furniture. */}
+        <OpenRegistrations />
 
         {/* Continue Your Track */}
         <div className="mb-10">
