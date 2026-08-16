@@ -368,10 +368,17 @@ export function normalizeExam(e) {
   }
 }
 
+// Every list below is student facing, so all of them hide drafts. An admin
+// still sees everything through the admin API, which reads the table directly.
+//
+// getExam(id) deliberately does NOT filter: a course step or an announcement
+// can point at a specific assessment, and a direct reference should keep
+// resolving. You cannot stumble on a draft, but you can be sent one.
 export async function getAllExams() {
   const { data, error } = await supabaseAdmin
     .from('exams')
     .select('*')
+    .eq('publish', true)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -394,6 +401,7 @@ export async function getFeaturedExams() {
     .from('exams')
     .select('*')
     .eq('featured', true)
+    .eq('publish', true)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -406,6 +414,7 @@ export async function getAssessment(name, grade) {
     .select('*')
     .eq('name', name)
     .eq('grade', grade)
+    .eq('publish', true)
     .single()
 
   if (error) throw error
@@ -1082,7 +1091,7 @@ export async function getTrackContent(trackId) {
       ? supabaseAdmin.from('courses').select('*').in('id', idsByType.course).then(r => r.data || [])
       : Promise.resolve([]),
     idsByType.exam?.length
-      ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).then(r => r.data || []).then(rows => rows.map(normalizeExam))
+      ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).eq('publish', true).then(r => r.data || []).then(rows => rows.map(normalizeExam))
       : Promise.resolve([]),
     idsByType.camp?.length
       ? supabaseAdmin.from('camps').select('*').in('id', idsByType.camp).then(r => r.data || [])
