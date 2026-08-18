@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Activity, BookOpen, ChevronRight, Cpu, FileText, HelpCircle, Home, Menu, Users, Calendar, LayoutList, Compass, Clock, ClipboardList } from "lucide-react"
-import { jwtDecode } from "jwt-decode"
-import { use } from "react"
+import { Activity, BookOpen, ChevronRight, HelpCircle, Home, Menu, Calendar, Compass, Clock, ClipboardList, ShoppingBag, Library, Receipt, Trophy } from "lucide-react"
+import { useCart } from "../../store/CartContext"
 
 // Brand colors with additional shades for consistency
 const brandColors = {
@@ -37,16 +36,19 @@ const SIDEBAR_GROUPS = [
   {
     label: "Browse Everything",
     items: [
-      { name: "Programs", icon: FileText, href: "/programs" },
+      { name: "Programs", icon: Trophy, href: "/programs" },
       { name: "Learning Hub", icon: BookOpen, href: "/learning-management" },
       { name: "Assessments", icon: Activity, href: "/assessment-management" },
+      { name: "Marketplace", icon: ShoppingBag, href: "/marketplace", badge: "cart" },
     ],
   },
   {
     label: "Account",
     items: [
-      { name: "Marketplace", icon: FileText, href: "/marketplace" },
-      { name: "Invoice", icon: LayoutList, href: "/invoice-page" },
+      // My Library is where anything bought or saved actually lands, so it
+      // sits directly above the money it was paid for.
+      { name: "My Library", icon: Library, href: "/my-library" },
+      { name: "Payments", icon: Receipt, href: "/payments" },
       { name: "Calendar", icon: Calendar, href: "/calendar-page" },
     ],
   },
@@ -58,6 +60,9 @@ const SIDEBAR_ITEMS = SIDEBAR_GROUPS.flatMap((group) => group.items)
 
 
 const Sidebar = () => {
+  // The cart count. Without it, adding something and navigating away leaves
+  // no sign anywhere that a cart is waiting.
+  const { count: cartCount } = useCart()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [expandedItems, setExpandedItems] = useState({})
   // Labeled groups (Browse Everything, Account) start collapsed — Tracks is the
@@ -291,13 +296,21 @@ const Sidebar = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      <div className={`p-2 rounded-md ${isItemActive(item.href) ? 'bg-accent' : 'bg-white bg-opacity-10'}`}>
-                        <item.icon 
-                          size={20} 
-                          color={isItemActive(item.href) ? brandColors.white : brandColors.accentLight} 
+                      <div className={`relative p-2 rounded-md ${isItemActive(item.href) ? 'bg-accent' : 'bg-white bg-opacity-10'}`}>
+                        <item.icon
+                          size={20}
+                          color={isItemActive(item.href) ? brandColors.white : brandColors.accentLight}
                         />
+                        {/* Shown on the icon rather than beside the label so it
+                            survives the sidebar being collapsed to 80px */}
+                        {item.badge === "cart" && cartCount > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold text-white grid place-items-center"
+                            style={{ backgroundColor: "#E8A020" }}>
+                            {cartCount > 9 ? "9+" : cartCount}
+                          </span>
+                        )}
                       </div>
-                      
+
                       <AnimatePresence>
                         {isSidebarOpen && (
                           <motion.div

@@ -260,10 +260,14 @@ export async function updateStepNote(userId, courseId, stepId, note) {
   return { success: true }
 }
 
+// Student facing, so drafts are hidden for the same reason they are on the
+// assessment lists. fetchCourseInfo(id) stays unfiltered: a course step or a
+// library entitlement pointing at a specific course should keep resolving.
 export async function getAllCoursesInfo() {
   const { data, error } = await supabaseAdmin
     .from('courses')
     .select('*')
+    .eq('publish', true)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -314,6 +318,33 @@ export async function fetchCourseProgress(userId, courseId) {
 
   if (error && error.code !== 'PGRST116') throw error
   return { success: true, progress: data || null }
+}
+
+/**
+ * Progress across every course at once, keyed by course id.
+ *
+ * The Learning Hub used to fetch these one at a time in a sequential loop, so
+ * drawing a page of ten courses meant ten round trips before the first
+ * progress bar could move. It also read `moduleStatus`, a field this table
+ * has never had, so the answer was always false.
+ */
+export async function fetchAllCourseProgress(userId) {
+  if (!userId) return { progress: {} }
+  const { data, error } = await supabaseAdmin
+    .from('course_progress')
+    .select('course_id, step_status')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  const progress = {}
+  ;(data || []).forEach((row) => {
+    const steps = Array.isArray(row.step_status) ? row.step_status : []
+    progress[row.course_id] = {
+      done: steps.filter((s) => s.completed).length,
+      total: steps.length,
+    }
+  })
+  return { progress }
 }
 
 export async function updateCourseProgress(userId, updates) {

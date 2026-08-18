@@ -18,7 +18,6 @@ import LearningManagement from "./Pages/LearningManagement";
 import AssessmentManagement from "./Pages/AssessmentManagement";
 import FeaturedQuizzes from "./Pages/FeaturedQuizzes";
 import AIAgent from "./Pages/AIAgent";
-import InvoiceList from "./Pages/InvoiceList";
 import Diagnostics from "./Pages/Diagnostics";
 import { useContext,useEffect, useState } from "react";
 import Select from "./Pages/SelectGraduatWP";
@@ -42,8 +41,10 @@ import QuizOverview from "./Pages/QuizOverview";
 import ProgramsPage from "./Pages/Programs";
 import CourseViewPage from "./Pages/CoursePage";
 import ChannelFeed from "./Pages/ChannelFeed";
-import InvoicePage from "./Pages/InvoiceList";
 import CalendarPage from "./Pages/Calendar";
+import Payments from "./Pages/Payments";
+import Checkout from "./Pages/Checkout";
+import MyLibrary from "./Pages/MyLibrary";
 
 import UserDetails from "./Pages/UserDetails";
 import InvoiceChannel from "./Pages/InvoiceChannel";
@@ -84,7 +85,27 @@ import ClaimAccount from "./Pages/ClaimAccount";
 import useGATracking from "./Pages/UseGATracking";
 
 
+// Which routes are inside the signed-in app and therefore get the sidebar.
+//
+// This was a single expression chaining nineteen pathname comparisons with
+// ||, which is why /programs and /marketplace were never in it and had to
+// import the sidebar themselves, and why the marketplace grew its own header
+// instead. A list is something you can add a line to.
+const SIDEBAR_ROUTES = [
+  "/overview", "/tracks", "/history", "/profile", "/my-registrations",
+  "/programs", "/learning-management", "/assessment-management",
+  "/marketplace", "/checkout", "/my-library", "/payments", "/invoice-page",
+  "/calendar-page", "/community", "/ai-agent", "/diagnostics", "/invoice",
+  "/contest-overview", "/contest-page", "/leaderboard",
+  "/practice-overview", "/practice",
+]
 
+const SIDEBAR_PREFIXES = ["/track/"]
+
+function showsSidebar(pathname) {
+  return SIDEBAR_ROUTES.includes(pathname) ||
+         SIDEBAR_PREFIXES.some((p) => pathname.startsWith(p))
+}
 
 
 function App() {
@@ -143,7 +164,7 @@ function App() {
 				<div className='absolute inset-0 backdrop-blur-sm' />
 			</div> */}
 
-			{(location.pathname=="/overview"||location.pathname=="/community"||location.pathname=="/learning-management"||location.pathname=="/assessment-management"||location.pathname=="/ai-agent"||location.pathname=="/invoice"||location.pathname=="/diagnostics"|| location.pathname=="/invoice-page"||location.pathname=="/calendar-page" || location.pathname=="/tracks" || location.pathname.startsWith("/track/") || location.pathname=="/history" || location.pathname=="/profile" || location.pathname=="/contest-overview" || location.pathname=="/contest-page" || location.pathname=="/leaderboard" || location.pathname=="/practice-overview" || location.pathname=="/practice" || location.pathname=="/my-registrations")&&<Sidebar className="overflow-y-hidden" />}
+			{showsSidebar(location.pathname) && <Sidebar className="overflow-y-hidden" />}
 			<div className="flex-1 h-screen overflow-y-auto">
 			<Routes>
 				{/* Redesigned marketing and auth surfaces. The previous landing
@@ -159,7 +180,10 @@ function App() {
 				<Route path='/learning-management' element={<LearningManagement />} />
 				<Route path='/assessment-management' element={<AssessmentManagement />} />
 				<Route path='/ai-agent' element={<AIAgent />} />
-				<Route path='/invoice' element={<InvoiceList />} />
+				{/* Both old invoice paths land on Payments. The page they used to
+				    reach had a Pay button that marked the row paid without taking
+				    any money, so it is gone rather than left reachable. */}
+				<Route path='/invoice' element={<Payments />} />
 				<Route path='/diagnostics' element={<Diagnostics />} />
 				<Route element={<Select competitionList={competitionList}/>} path='/purpose'/>
 				<Route element={<Auth/>} path="/sign-up"/>
@@ -196,7 +220,14 @@ function App() {
 				<Route element={<CourseViewPage/>} path="/course-view"/>
 
 				<Route element={<ChannelFeed/>} path="/channel-page"/>
-				<Route element={<InvoicePage/>} path="/invoice-page"/>
+				{/* Payments replaces the old Invoice screen, whose Pay button
+				    marked a row paid without taking any money. The old path is
+				    kept pointing here so existing links and bookmarks land
+				    somewhere that works. */}
+				<Route element={<Payments/>} path="/payments"/>
+				<Route element={<Payments/>} path="/invoice-page"/>
+				<Route element={<Checkout/>} path="/checkout"/>
+				<Route element={<MyLibrary/>} path="/my-library"/>
 				<Route element={<CalendarPage/>} path="/calendar-page"/>
 
 				<Route element={<UserDetails/>} path="/user-details"/>

@@ -1,456 +1,371 @@
-"use client"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import {
+  Trophy, Search, CalendarDays, ArrowRight, CheckCircle2, Clock, X, Info,
+} from "lucide-react"
+import { getAllCompetitions } from "../lib/api"
+import { getOpenForms, getMyRegistrations } from "../lib/registrationApi"
+import { A, shortDate, daysUntil } from "../lib/appTheme"
+import { Page, PageHead, FilterRow, Empty, Notice, Btn } from "../Components/common/PageShell"
 
-import Sidebar from "../Components/common/Sidebar";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getAllCompetitions, getAllInterests, getRegisteredPrograms } from "../lib/api";
-import { jwtDecode } from "jwt-decode";
+// The competitions catalogue.
+//
+// Three things were wrong with the page this replaces.
+//
+// Every card read "Start: TBD / End: TBD". The competitions table stores
+// start_date and end_date; the page read startDate and EndDate, which do not
+// exist on the row, so the formatter fell through to its fallback every time.
+//
+// Titles were built as `${name}-${year}`, which is why the screen showed
+// "IGeo Ghana-2025" with a hyphen jammed against the year.
+//
+// And "Register Now" pushed into /subitem/:name, the old invoice flow, not
+// the registration forms. So the one action on the page went somewhere that
+// no longer takes registrations. It now resolves the competition's open form
+// and goes there, and says plainly when there is no open form to go to.
 
-const ProgramsPageWithSidebar = () => {
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [allCompetitions, setCompetitions] = useState([]);
-  const [registered, setRegistered] = useState([]);
-  const [available, setAvailable] = useState([]);
-  const [startDateFilter, setStartDateFilter] = useState("");
-  const [endDateFilter, setEndDateFilter] = useState("");
-  const [selectedInterest, setSelectedInterest] = useState("");
-  const [interestOptions, setInterestOptions] = useState([]);
-  const [quickStartFilter, setQuickStartFilter] = useState("");
-  const [quickEndFilter, setQuickEndFilter] = useState("");
-  const [filterMaterialCostZero, setFilterMaterialCostZero] = useState(false);
-  const [filterAssessmentCostZero, setFilterAssessmentCostZero] = useState(false);
-  const [filterCompetitionCostZero, setFilterCompetitionCostZero] = useState(false);
+export default function Programs() {
+  const navigate = useNavigate()
 
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        const response = await getAllCompetitions();
-        const data = response.AllCompetitions;
-        setCompetitions(data);
-      } catch (error) {
-        console.error("Error fetching programs:", error);
-      }
-    };
-
-    fetchPrograms();
-  }, []);
-
-  useEffect(() => {
-    const fetchInterests = async () => {
-      try {
-        const response = await getAllInterests();
-        const payload = response.interests || [];
-        let list = Array.isArray(payload)
-          ? payload
-          : payload.data || payload.interests || [];
-        if (!Array.isArray(list)) list = [];
-        const labels = Array.from(
-          new Set(
-            list
-              .map((item) => {
-                if (typeof item === "string") return item;
-                return (
-                  item?.name || item?.interest || item?.type || item?.title || ""
-                );
-              })
-              .filter(Boolean)
-          )
-        );
-        setInterestOptions(labels);
-      } catch (error) {
-        console.error("Error fetching interests:", error);
-      }
-    };
-
-    fetchInterests();
-  }, []);
+  const [comps, setComps]   = useState([])
+  const [forms, setForms]   = useState([])
+  const [mine, setMine]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]   = useState("")
+  const [search, setSearch] = useState("")
+  const [when, setWhen]     = useState("all")
+  const [detail, setDetail] = useState(null)
 
   useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        const profile = JSON.parse(localStorage.getItem("user") || "{}");
-        const firstName = profile.first_name || profile.firstName || "";
-        const lastName = profile.last_name || profile.lastName || "";
-        const fullName = `${firstName} ${lastName}`.trim();
-        const year = new Date().getFullYear();
-        const response = await getRegisteredPrograms(fullName);
-        const data = response.programs;
+    let alive = true
+    ;(async () => {
+      // Competitions are the page. Forms and registrations only decorate it,
+      // so a signed-out visitor still sees the catalogue.
+      const [c, f, r] = await Promise.allSettled([
+        getAllCompetitions(), getOpenForms(), getMyRegistrations(),
+      ])
+      if (!alive) return
 
-        // Match and replace from allCompetitions
-        const updatedRegistered = data.map((regItem) => {
-          const match = allCompetitions.find((comp) => comp.name === regItem.program);
-          return match ? match : regItem;
-        });
+      if (c.status === "fulfilled") setComps(c.value.AllCompetitions || [])
+      else setError(c.reason?.message || "We could not load the programmes.")
 
-        setRegistered(updatedRegistered);
+      if (f.status === "fulfilled") setForms(f.value.forms)
+      if (r.status === "fulfilled") setMine(r.value.registrations)
 
-        // Create list of unregistered competitions
-        const unregistered = allCompetitions.filter(
-          (item) => !updatedRegistered.some((reg) => reg.name === item.name)
-        );
+      setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [])
 
-        setAvailable(unregistered);
-      } catch (error) {
-        console.error("Error fetching registered programs:", error);
-      }
-    };
+  // A competition's intake is matched on program_id first, then on title,
+  // because forms built before the picker existed only carry the title.
+  const formFor = useMemo(() => {
+    const byId    = new Map()
+    const byTitle = new Map()
+    forms.forEach((f) => {
+      if (f.program_id) byId.set(f.program_id, f)
+      if (f.program_title) byTitle.set(norm(f.program_title), f)
+    })
+    return (c) => byId.get(c.id) || byTitle.get(norm(c.name)) || null
+  }, [forms])
 
-    fetchPrograms();
-  }, [allCompetitions]);
+  const registeredForm = useMemo(
+    () => new Set(mine.filter((r) => r.status !== "draft").map((r) => r.form_id)),
+    [mine]
+  )
 
-  const handleCardClick = (id, subItem) => {
-    localStorage.setItem("id", id);
-    localStorage.setItem("state", JSON.stringify(subItem));
-    navigate(`/subitem/${subItem.name}`, { state: subItem });
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "TBD";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  // Helpers for date-based quick filters
-  const startOfDay = (date) => {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  };
-
-  const isSameDay = (a, b) => {
-    if (!a || !b) return false;
-    return startOfDay(a).getTime() === startOfDay(b).getTime();
-  };
-
-  const addDays = (date, days) => {
-    const copy = new Date(date);
-    copy.setDate(copy.getDate() + days);
-    return copy;
-  };
-
-  const addMonths = (date, months) => {
-    const copy = new Date(date);
-    copy.setMonth(copy.getMonth() + months);
-    return copy;
-  };
-
-  // Week helpers
-  const startOfWeek = (date) => {
-    const copy = startOfDay(new Date(date));
-    // Set Monday as start of week (0=Sun,1=Mon,...)
-    const day = copy.getDay();
-    const diffToMonday = (day + 6) % 7; // 0->6, 1->0, 2->1, ...
-    copy.setDate(copy.getDate() - diffToMonday);
-    return copy;
-  };
-
-  const endOfWeek = (date) => {
-    const start = startOfWeek(date);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    return end;
-  };
-
-  const isInThisMonth = (d, ref) =>
-    d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
-
-  const isInThisWeek = (d, ref) => {
-    const start = startOfWeek(ref);
-    const end = endOfWeek(ref);
-    const day = startOfDay(d);
-    return day >= start && day <= end;
-  };
-
-  const passesStartQuickFilter = (program) => {
-    if (!quickStartFilter) return true;
-    const start = program.startDate ? new Date(program.startDate) : null;
-    if (!start) return false;
-    const today = startOfDay(new Date());
-    if (quickStartFilter === "today") return isSameDay(start, today);
-    if (quickStartFilter === "this_week") return isInThisWeek(start, today);
-    if (quickStartFilter === "this_month") return isInThisMonth(start, today);
-    return true;
-  };
-
-  const passesEndQuickFilter = (program) => {
-    if (!quickEndFilter) return true;
-    const endRaw = program.endDate || program.EndDate;
-    const end = endRaw ? new Date(endRaw) : null;
-    if (!end) return false;
-    const today = startOfDay(new Date());
-    if (quickEndFilter === "today") return isSameDay(end, today);
-    if (quickEndFilter === "this_week") return isInThisWeek(end, today);
-    if (quickEndFilter === "this_month") return isInThisMonth(end, today);
-    return true;
-  };
-
-  const isZeroCost = (value) => {
-    if (value === null || value === undefined) return false;
-    const num = typeof value === "string" ? parseFloat(value) : Number(value);
-    if (Number.isNaN(num)) return false;
-    return num === 0;
-  };
-
-  // Filter both registered and available programs by search term
-  const searchLower = searchTerm.toLowerCase();
-
-  const filteredRegistered = registered.filter((program) => {
-    const nameLower = (program.name || program.program || "").toLowerCase();
-    if (!nameLower.includes(searchLower)) return false;
-
-    if (selectedInterest) {
-      const programType =
-        (program.item && program.item.type) ||
-        program.type ||
-        program.Type ||
-        "";
-      if (String(programType).toLowerCase() !== selectedInterest.toLowerCase()) {
-        return false;
-      }
+  const rows = useMemo(() => comps.map((c) => {
+    const form = formFor(c)
+    const start = c.start_date || null
+    const end   = c.end_date || null
+    return {
+      ...c,
+      start, end,
+      form,
+      entered: form ? registeredForm.has(form.id) : false,
+      closes: form?.closes_at || null,
+      upcoming: start ? new Date(start) >= new Date(new Date().toDateString()) : false,
     }
+  }), [comps, formFor, registeredForm])
 
-    if (startDateFilter) {
-      const programStart = program.startDate ? new Date(program.startDate) : null;
-      const filterStart = new Date(startDateFilter);
-      if (!programStart || programStart < filterStart) return false;
-    }
+  const q = search.trim().toLowerCase()
+  const shown = rows.filter((c) => {
+    if (q && ![c.name, c.description, c.type].filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q))) return false
+    if (when === "open")     return !!c.form && !c.entered
+    if (when === "mine")     return c.entered
+    if (when === "upcoming") return c.upcoming
+    return true
+  })
 
-    if (endDateFilter) {
-      const endRaw = program.endDate || program.EndDate;
-      const programEnd = endRaw ? new Date(endRaw) : null;
-      const filterEnd = new Date(endDateFilter);
-      if (!programEnd || programEnd > filterEnd) return false;
-    }
-
-    if (!passesStartQuickFilter(program)) return false;
-    if (!passesEndQuickFilter(program)) return false;
-
-    if (filterMaterialCostZero) {
-      const material = program.materialCost ?? program.MaterialCost;
-      if (!isZeroCost(material)) return false;
-    }
-
-    if (filterAssessmentCostZero) {
-      const assessment = program.assessmentCost ?? program.AssessmentCost;
-      if (!isZeroCost(assessment)) return false;
-    }
-
-    if (filterCompetitionCostZero) {
-      const competition = program.competitionCost ?? program.CompetitionCost;
-      if (!isZeroCost(competition)) return false;
-    }
-
-    return true;
-  });
-
-  const filteredAvailable = available.filter((program) => {
-    const nameLower = (program.name || "").toLowerCase();
-    if (!nameLower.includes(searchLower)) return false;
-
-    if (selectedInterest) {
-      const programType =
-        (program.item && program.item.type) ||
-        program.type ||
-        program.Type ||
-        "";
-      if (String(programType).toLowerCase() !== selectedInterest.toLowerCase()) {
-        return false;
-      }
-    }
-
-    if (startDateFilter) {
-      const programStart = program.startDate ? new Date(program.startDate) : null;
-      const filterStart = new Date(startDateFilter);
-      if (!programStart || programStart < filterStart) return false;
-    }
-
-    if (endDateFilter) {
-      const endRaw = program.endDate || program.EndDate;
-      const programEnd = endRaw ? new Date(endRaw) : null;
-      const filterEnd = new Date(endDateFilter);
-      if (!programEnd || programEnd > filterEnd) return false;
-    }
-
-    if (!passesStartQuickFilter(program)) return false;
-    if (!passesEndQuickFilter(program)) return false;
-
-    if (filterMaterialCostZero) {
-      const material = program.materialCost ?? program.MaterialCost;
-      if (!isZeroCost(material)) return false;
-    }
-
-    if (filterAssessmentCostZero) {
-      const assessment = program.assessmentCost ?? program.AssessmentCost;
-      if (!isZeroCost(assessment)) return false;
-    }
-
-    if (filterCompetitionCostZero) {
-      const competition = program.competitionCost ?? program.CompetitionCost;
-      if (!isZeroCost(competition)) return false;
-    }
-
-    return true;
-  });
+  const counts = {
+    all: rows.length,
+    open: rows.filter((c) => c.form && !c.entered).length,
+    mine: rows.filter((c) => c.entered).length,
+    upcoming: rows.filter((c) => c.upcoming).length,
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 w-full">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden p-6">
-        <div className="flex flex-col items-center text-center mb-10">
-          <h1 className="text-4xl font-extrabold text-[#003366] mb-2">Gifted Education Platform</h1>
-          <h2 className="text-2xl font-semibold text-[#336699] mb-1">Programs & Competitions</h2>
-          <p className="text-gray-600 text-base max-w-xl">
-            Select a competition type to explore available programs and track your progress
-          </p>
-        </div>
+    <Page wide>
+      <PageHead
+        title="Programmes and competitions"
+        sub="Every olympiad and competition we run. Registration opens on the card when it opens."
+        actions={<Btn variant="secondary" onClick={() => navigate("/my-registrations")}>My registrations</Btn>}
+      />
 
-        <div className="flex items-center mb-6 flex-wrap gap-3">
-          <input
-            type="text"
-            placeholder="Search programs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-md p-2 border border-gray-300 rounded-lg mr-4"
-          />
-          <input
-            type="date"
-            value={startDateFilter}
-            onChange={(e) => setStartDateFilter(e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg"
-            aria-label="Filter by start date"
-          />
-          <input
-            type="date"
-            value={endDateFilter}
-            onChange={(e) => setEndDateFilter(e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg"
-            aria-label="Filter by end date"
-          />
-          <select
-            value={selectedInterest}
-            onChange={(e) => setSelectedInterest(e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg"
-            aria-label="Filter by type"
-          >
-            <option value="">All types</option>
-            {interestOptions.map((label) => (
-              <option key={label} value={label}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Start:</span>
-            <div className="flex rounded-full bg-gray-100 p-1">
-              {[
-                { key: "", label: "All" },
-                { key: "today", label: "Today" },
-                { key: "this_week", label: "This week" },
-                { key: "this_month", label: "This month" },
-              ].map((opt) => (
-                <button
-                  key={opt.key || "all"}
-                  onClick={() => setQuickStartFilter(opt.key)}
-                  className={`${quickStartFilter === opt.key ? "bg-[#003366] text-white" : "text-[#003366]"} px-3 py-1 text-xs rounded-full transition`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">End:</span>
-            <div className="flex rounded-full bg-gray-100 p-1">
-              {[
-                { key: "", label: "All" },
-                { key: "today", label: "Today" },
-                { key: "this_week", label: "This week" },
-                { key: "this_month", label: "This month" },
-              ].map((opt) => (
-                <button
-                  key={opt.key || "all"}
-                  onClick={() => setQuickEndFilter(opt.key)}
-                  className={`${quickEndFilter === opt.key ? "bg-[#003366] text-white" : "text-[#003366]"} px-3 py-1 text-xs rounded-full transition`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Costs:</span>
-            <div className="flex rounded-full bg-gray-100 p-1">
-              <button
-                onClick={() => setFilterMaterialCostZero((v) => !v)}
-                className={`${filterMaterialCostZero ? "bg-green-600 text-white" : "text-green-700"} px-3 py-1 text-xs rounded-full transition`}
-                aria-pressed={filterMaterialCostZero}
-              >
-                Material = 0
-              </button>
-              <button
-                onClick={() => setFilterAssessmentCostZero((v) => !v)}
-                className={`${filterAssessmentCostZero ? "bg-blue-600 text-white" : "text-blue-700"} px-3 py-1 text-xs rounded-full transition`}
-                aria-pressed={filterAssessmentCostZero}
-              >
-                Assessment = 0
-              </button>
-              <button
-                onClick={() => setFilterCompetitionCostZero((v) => !v)}
-                className={`${filterCompetitionCostZero ? "bg-purple-600 text-white" : "text-purple-700"} px-3 py-1 text-xs rounded-full transition`}
-                aria-pressed={filterCompetitionCostZero}
-              >
-                Competition = 0
-              </button>
-            </div>
-          </div>
-          <button className="bg-[#003366] text-white px-4 py-2 rounded-lg">Search</button>
-        </div>
+      {error && <Notice tone="bad">{error}</Notice>}
 
-        <h1 className="text-2xl font-bold text-[#003366] mb-6">Your Registered Programs</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-          {filteredRegistered.map((program, index) => (
-            <div
-              key={index}
-              className="bg-white p-4 rounded-lg shadow-md border border-[#003366] hover:shadow-lg cursor-pointer"
-              onClick={() => handleCardClick(program.id, program)}
-            >
-              <h3 className="text-xl font-semibold text-[#003366] mb-2">
-                {`${program.name || program.program}-${program.year}`}
-              </h3>
-              <p className="text-sm text-gray-600">Start: {formatDate(program.startDate)}</p>
-              <p className="text-sm text-gray-600">End: {formatDate(program.endDate || program.EndDate)}</p>
-              <p className="text-sm text-green-600 font-medium mt-2">Registered</p>
+      <div className="relative mb-4">
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: A.subtle }} />
+        <input
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search programmes"
+          className="w-full pl-11 pr-10 rounded-xl border bg-white text-base focus:outline-none"
+          style={{ borderColor: A.line, color: A.ink, height: 48 }}
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+            aria-label="Clear search">
+            <X size={16} style={{ color: A.subtle }} />
+          </button>
+        )}
+      </div>
+
+      <FilterRow
+        className="mb-6"
+        value={when} onChange={setWhen}
+        options={[
+          { value: "all",      label: "Everything",     count: counts.all },
+          { value: "open",     label: "Open now",       count: counts.open },
+          { value: "mine",     label: "I'm entered",    count: counts.mine },
+          { value: "upcoming", label: "Coming up",      count: counts.upcoming },
+        ]}
+      />
+
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-white border p-5 space-y-3" style={{ borderColor: A.line }}>
+              <div className="h-5 w-3/4 rounded animate-pulse" style={{ backgroundColor: A.lineSoft }} />
+              <div className="h-3.5 rounded animate-pulse" style={{ backgroundColor: A.lineSoft }} />
+              <div className="h-9 rounded-xl animate-pulse" style={{ backgroundColor: A.lineSoft }} />
             </div>
           ))}
         </div>
+      ) : shown.length === 0 ? (
+        <Empty
+          icon={Trophy}
+          title={q ? "Nothing matches that" : when === "mine" ? "You have not entered anything yet" : "Nothing here right now"}
+          line={when === "mine"
+            ? "Programmes you enter show up here so you can find them again."
+            : "Try clearing the filter."}
+          action={(q || when !== "all") && (
+            <Btn variant="secondary" onClick={() => { setSearch(""); setWhen("all") }}>Show everything</Btn>
+          )}
+        />
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {shown.map((c) => (
+            <ProgramCard key={c.id} program={c} onOpen={() => setDetail(c)}
+              onRegister={() => navigate(`/register/${c.form.slug || c.form.id}`)} />
+          ))}
+        </div>
+      )}
 
-        <h1 className="text-2xl font-bold text-[#003366] mb-6">Available Programs</h1>
-        {filteredAvailable.length === 0 ? (
-          <p className="text-gray-600">You have registered for all available programs.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAvailable.map((program, index) => (
-              <div
-                key={index}
-                className="bg-white p-4 rounded-lg shadow-md border border-gray-300 hover:shadow-lg cursor-pointer"
-                onClick={() => handleCardClick(program.id, program)}
-              >
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">{`${program.name}-${program.year}`}</h3>
-                <p className="text-sm text-gray-600">Start: {formatDate(program.startDate)}</p>
-                <p className="text-sm text-gray-600">End: {formatDate(program.endDate)}</p>
-                <button className="mt-3 bg-[#336699] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#003366]">
-                  Register Now
-                </button>
-              </div>
-            ))}
+      {detail && (
+        <DetailSheet program={detail} onClose={() => setDetail(null)}
+          onRegister={() => navigate(`/register/${detail.form.slug || detail.form.id}`)} />
+      )}
+    </Page>
+  )
+}
+
+const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+
+// ── One competition ────────────────────────────────────────────────────────
+
+function ProgramCard({ program: c, onOpen, onRegister }) {
+  const left = daysUntil(c.closes)
+
+  return (
+    <div className="rounded-2xl bg-white border overflow-hidden flex flex-col transition-shadow hover:shadow-lg"
+      style={{ borderColor: A.line }}>
+
+      {c.image ? (
+        <button onClick={onOpen} className="block w-full">
+          <div className="aspect-[16/7] overflow-hidden" style={{ backgroundColor: A.lineSoft }}>
+            <img src={c.image} alt="" loading="lazy" className="w-full h-full object-cover"
+              onError={(e) => { e.target.parentElement.style.display = "none" }} />
           </div>
+        </button>
+      ) : (
+        <div className="h-1.5 w-full" style={{ backgroundColor: c.entered ? A.green : A.navy }} />
+      )}
+
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          {/* The year is its own line rather than glued to the title with a
+              hyphen, which is what produced "IGeo Ghana-2025" on screen. */}
+          <div className="min-w-0">
+            {c.year && (
+              <p className="text-[11px] uppercase tracking-wide" style={{ color: A.accent }}>
+                {c.type ? `${c.type} · ${c.year}` : c.year}
+              </p>
+            )}
+            <button onClick={onOpen} className="text-left">
+              <h3 className="font-semibold leading-snug" style={{ color: A.navy }}>{c.name}</h3>
+            </button>
+          </div>
+
+          {c.entered && (
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md flex items-center gap-1"
+              style={{ backgroundColor: A.greenSoft, color: A.green }}>
+              <CheckCircle2 size={10} /> Entered
+            </span>
+          )}
+        </div>
+
+        {(c.start || c.end) && (
+          <p className="text-xs flex items-center gap-1.5 mb-3" style={{ color: A.mid }}>
+            <CalendarDays size={12} />
+            {c.start && c.end
+              ? `${shortDate(c.start)} to ${shortDate(c.end)}`
+              : shortDate(c.start || c.end)}
+          </p>
         )}
+
+        {c.description && (
+          <p className="text-xs line-clamp-2 mb-4" style={{ color: A.muted }}>{c.description}</p>
+        )}
+
+        <div className="mt-auto">
+          {c.entered ? (
+            <Btn size="sm" variant="secondary" full onClick={onOpen}>See the details</Btn>
+          ) : c.form ? (
+            <>
+              <Btn size="sm" full onClick={onRegister}>
+                Register for this <ArrowRight size={14} />
+              </Btn>
+              {left !== null && left >= 0 && left <= 14 && (
+                <p className="text-xs mt-2 flex items-center gap-1 font-medium"
+                  style={{ color: left <= 3 ? A.red : A.amber }}>
+                  <Clock size={11} />
+                  {left === 0 ? "Registration closes today" : `${left} day${left === 1 ? "" : "s"} left to register`}
+                </p>
+              )}
+            </>
+          ) : (
+            // Honest rather than a button that goes nowhere. This is the state
+            // the old page hid behind a Register Now on every single card.
+            <Btn size="sm" variant="secondary" full onClick={onOpen}>
+              <Info size={14} /> Registration not open yet
+            </Btn>
+          )}
+        </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ProgramsPageWithSidebar;
+// ── Detail ─────────────────────────────────────────────────────────────────
+
+function DetailSheet({ program: c, onClose, onRegister }) {
+  useEffect(() => {
+    const esc = (e) => e.key === "Escape" && onClose()
+    window.addEventListener("keydown", esc)
+    document.body.style.overflow = "hidden"
+    return () => { window.removeEventListener("keydown", esc); document.body.style.overflow = "" }
+  }, [onClose])
+
+  const subTypes = Array.isArray(c.sub_types) ? c.sub_types : []
+  const costs = [
+    ["Materials",   c.material_cost],
+    ["Assessment",  c.assessment_cost],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== "")
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ backgroundColor: "rgba(8,24,42,0.45)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[92vh] flex flex-col">
+
+        <div className="flex items-start justify-between gap-3 px-5 sm:px-6 py-4 border-b shrink-0"
+          style={{ borderColor: A.line }}>
+          <div className="min-w-0">
+            {c.year && <p className="text-[11px] uppercase tracking-wide" style={{ color: A.accent }}>
+              {c.type ? `${c.type} · ${c.year}` : c.year}
+            </p>}
+            <h2 className="text-xl font-bold leading-tight" style={{ color: A.navy }}>{c.name}</h2>
+          </div>
+          <button onClick={onClose} className="p-2 -mr-2 shrink-0" aria-label="Close">
+            <X size={18} style={{ color: A.mid }} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-5 sm:px-6 py-5 space-y-5">
+          {(c.start || c.end) && (
+            <div className="flex items-center gap-2 text-sm" style={{ color: A.muted }}>
+              <CalendarDays size={15} style={{ color: A.mid }} />
+              {c.start && c.end
+                ? `${shortDate(c.start)} to ${shortDate(c.end)}`
+                : shortDate(c.start || c.end)}
+            </div>
+          )}
+
+          {c.description && (
+            <p className="text-sm whitespace-pre-line" style={{ color: A.muted, lineHeight: 1.65 }}>
+              {c.description}
+            </p>
+          )}
+
+          {subTypes.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: A.mid }}>Rounds</h3>
+              <div className="space-y-1.5">
+                {subTypes.map((s, i) => (
+                  <div key={i} className="flex justify-between text-sm rounded-lg px-3 py-2"
+                    style={{ backgroundColor: A.lineSoft }}>
+                    <span style={{ color: A.navy }}>{s.type || s.name || `Round ${i + 1}`}</span>
+                    <span style={{ color: A.mid }}>
+                      {shortDate(s.startDate || s.start_date) || "Date to come"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {costs.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: A.mid }}>Costs</h3>
+              <div className="space-y-1.5">
+                {costs.map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm">
+                    <span style={{ color: A.muted }}>{label}</span>
+                    <span className="font-medium" style={{ color: A.navy }}>
+                      {Number(value) === 0 ? "Free" : `GH₵${value}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t px-5 sm:px-6 py-4 shrink-0" style={{ borderColor: A.line }}>
+          {c.entered ? (
+            <p className="text-sm flex items-center gap-2" style={{ color: A.green }}>
+              <CheckCircle2 size={15} /> You are entered for this one.
+            </p>
+          ) : c.form ? (
+            <Btn full onClick={onRegister}>Register for this <ArrowRight size={15} /></Btn>
+          ) : (
+            <p className="text-sm" style={{ color: A.mid }}>
+              Registration is not open yet. It will appear here and on your dashboard when it opens.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
