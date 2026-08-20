@@ -43,7 +43,7 @@ import CourseViewPage from "./Pages/CoursePage";
 import ChannelFeed from "./Pages/ChannelFeed";
 import CalendarPage from "./Pages/Calendar";
 import Payments from "./Pages/Payments";
-import Checkout from "./Pages/Checkout";
+import Checkout from "./Pages/checkOut";
 import MyLibrary from "./Pages/MyLibrary";
 
 import UserDetails from "./Pages/UserDetails";
