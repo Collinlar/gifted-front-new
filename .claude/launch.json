@@ -4,9 +4,23 @@
     {
       "name": "gifted-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "gifted-admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../gifted-admin",
+        "run",
+        "dev"
+      ],
+      "port": 3000
     }
   ]
 }

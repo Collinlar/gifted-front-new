@@ -1,61 +1,71 @@
 import { useEffect, useRef, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { T, display, body, useGiftedFonts } from "./giftedTheme"
-
-// ── Content ────────────────────────────────────────────────────────────────
-
-const PROGRAMMES = [
-  { title: "Mathematics Olympiad",   meta: "Ages 12–18", img: "/math.jpg",
-    line: "Algebra, number theory, combinatorics and geometry, taught through past olympiad papers." },
-  { title: "Physics Olympiad",       meta: "Ages 14–18", img: "/stem.jpg",
-    line: "Mechanics and electromagnetism worked to competition depth, with lab-style problem sessions." },
-  { title: "Informatics and Coding", meta: "Ages 13–18", img: "/eng_400x200.jpg",
-    line: "Algorithms, data structures and contest programming, graded on real judge problems." },
-  { title: "STEM Bootcamp",          meta: "3 weeks",    img: "/2.jpg",
-    line: "A short, fast introduction across maths, physics and computing for students testing the water." },
-  { title: "Pathways for Beginners", meta: "Ages 10–14", img: "/us.jpg",
-    line: "Foundations first: problem-solving habits, notation and confidence before competition work." },
-  { title: "Exams and Certification",meta: "Year-round", img: "/math.jpg",
-    line: "Sit accredited assessments and receive a certificate that schools can verify by serial number." },
-]
-
-const STEPS = [
-  { n: "01", title: "Choose a programme", body: "Start on a beginner pathway or go straight to a subject olympiad track. A short diagnostic places you." },
-  { n: "02", title: "Train every week",   body: "Live coaching, timed problem sets and past papers, with your progress tracked against the syllabus." },
-  { n: "03", title: "Sit and certify",    body: "Register through the portal, sit the supervised exam, and get a certificate schools can verify by serial." },
-]
-
-const EVENTS = [
-  { term: "Term 3",  name: "National Mathematics Olympiad", what: "Registration and paper selection for the national round.", when: "closes · tbc" },
-  { term: "Term 3",  name: "Physics Olympiad, Round One",   what: "Supervised sitting at partner centres in Accra and Kumasi.", when: "sits · tbc" },
-  { term: "Rolling", name: "Beginner Pathway Intake",       what: "Weekly classes for students new to competition work.",      when: "begins · tbc" },
-]
+import { getHomepage, DEFAULTS, list } from "../lib/homepageContent"
 
 const ROTATE_MS = 5200
+
+// The lower half of the page is the part an admin can reorder and switch off.
+// The hero is not in this list on purpose: the brand, the headline and the
+// programme index are one composed unit, and "hide the hero" would leave a
+// page that opens on a statistics strip.
+const MOVEABLE = ["proof", "steps", "dates"]
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  // ?preview=1 renders unpublished drafts, so the admin checks their edits on
+  // the real page rather than on an approximation of it
+  const preview = params.get("preview") === "1"
+
+  const [page, setPage]     = useState(null)
   const [active, setActive] = useState(0)
   const [paused, setPaused] = useState(false)
   const timer = useRef(null)
 
   useGiftedFonts()
 
+  useEffect(() => {
+    let alive = true
+    getHomepage({ preview }).then((p) => { if (alive) setPage(p) })
+    return () => { alive = false }
+  }, [preview])
+
+  // Render the defaults until the fetch lands. The homepage is the first thing
+  // anyone sees on a slow connection, and a spinner where the headline should
+  // be is worse than a headline that changes a moment later.
+  const sections = page?.sections || DEFAULTS
+  const hidden   = page?.hidden || new Set()
+
+  const brand      = sections.brand      || DEFAULTS.brand
+  const hero       = sections.hero       || DEFAULTS.hero
+  const programmes = sections.programmes || DEFAULTS.programmes
+  const proof      = sections.proof      || DEFAULTS.proof
+  const steps      = sections.steps      || DEFAULTS.steps
+  const dates      = sections.dates      || DEFAULTS.dates
+  const footer     = sections.footer     || DEFAULTS.footer
+
+  const items    = list(programmes.items, DEFAULTS.programmes.items)
+  const headline = list(hero.headline, DEFAULTS.hero.headline)
+
   // Rotate the hero imagery. Pauses on interaction so a chosen programme stays
   // put, and respects a reduced-motion preference by not rotating at all.
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    if (reduce || paused) return
-    timer.current = setInterval(() => setActive((i) => (i + 1) % PROGRAMMES.length), ROTATE_MS)
+    if (reduce || paused || items.length < 2) return
+    timer.current = setInterval(() => setActive((i) => (i + 1) % items.length), ROTATE_MS)
     return () => clearInterval(timer.current)
-  }, [paused])
+  }, [paused, items.length])
+
+  // A shorter list after an edit must not leave the highlight past the end
+  useEffect(() => { setActive((i) => (i < items.length ? i : 0)) }, [items.length])
 
   // Warm the images so switching does not flash on a slow connection
   useEffect(() => {
-    PROGRAMMES.forEach((p) => { const im = new Image(); im.src = p.img })
-  }, [])
+    items.forEach((p) => { if (p.img) { const im = new Image(); im.src = p.img } })
+  }, [page])
 
   const choose = (i) => { setActive(i); setPaused(true) }
 
@@ -64,15 +74,109 @@ export default function Home() {
     if (el) window.scrollTo({ top: el.offsetTop, behavior: "smooth" })
   }
 
+  // One destination field per button, so the admin can point anything at a
+  // section of this page, a route in the app, or somewhere else entirely
+  // without needing to know which is which.
+  const go = (target) => {
+    if (!target) return
+    if (target.startsWith("#")) return scrollTo(target.slice(1))
+    if (/^https?:\/\//i.test(target)) return window.open(target, "_blank", "noopener")
+    navigate(target)
+  }
+
+  const current = items[active] || items[0] || {}
+
+  const blocks = {
+    proof: !hidden.has("proof") && (
+      <section key="proof" id="proof" className="gf-proof">
+        {list(proof.stats, DEFAULTS.proof.stats).map((s, i) => (
+          <div key={`${s.label}-${i}`}>
+            <div className="gf-stat">{s.value}</div>
+            <div className="gf-statLabel">{s.label}</div>
+          </div>
+        ))}
+        {proof.line && <p className="gf-proofLine">{proof.line}</p>}
+      </section>
+    ),
+
+    steps: !hidden.has("steps") && (
+      <section key="steps" id="steps" className="gf-steps">
+        <div className="gf-sectionKicker">{steps.kicker}</div>
+        {list(steps.items, DEFAULTS.steps.items).map((s, i) => (
+          <div key={`${s.title}-${i}`} className="gf-step">
+            <span className="gf-stepNum">{s.n}</span>
+            <h3 className="gf-stepTitle">{s.title}</h3>
+            <p className="gf-stepBody">{s.body}</p>
+          </div>
+        ))}
+      </section>
+    ),
+
+    dates: !hidden.has("dates") && (
+      <section key="dates" id="dates" className="gf-dates">
+        <div className="gf-datesHead">
+          <h2 className="gf-h2">{dates.heading}</h2>
+          {dates.note && <p className="gf-datesNote">{dates.note}</p>}
+        </div>
+
+        {list(dates.items, DEFAULTS.dates.items).map((e, i) => (
+          <div key={`${e.name}-${i}`} className="gf-event">
+            <span className="gf-eventTerm">{e.term}</span>
+            <h3 className="gf-eventName">{e.name}</h3>
+            <span className="gf-eventWhat">{e.what}</span>
+            <span className="gf-eventWhen">{e.when}</span>
+            <button className="gf-eventCta" onClick={() => go(e.target || "/sign-up")}>
+              {dates.ctaLabel || "Register"}
+            </button>
+          </div>
+        ))}
+
+        {!hidden.has("footer") && (
+          <footer className="gf-footer">
+            <span className="gf-footBrand">{footer.brand}</span>
+            {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
+            {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
+            {footer.address && <span>{footer.address}</span>}
+            {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+          </footer>
+        )}
+      </section>
+    ),
+  }
+
+  // The footer is drawn inside the dates section because that is where the
+  // layout puts it. If dates is switched off it would vanish with it, so it
+  // gets its own strip in that case.
+  const orphanFooter = hidden.has("dates") && !hidden.has("footer") && (
+    <section key="footer" className="gf-dates">
+      <footer className="gf-footer">
+        <span className="gf-footBrand">{footer.brand}</span>
+        {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
+        {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
+        {footer.address && <span>{footer.address}</span>}
+        {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+      </footer>
+    </section>
+  )
+
+  const ordered = (page?.order || MOVEABLE).filter((k) => MOVEABLE.includes(k))
+  const lower = ordered.length ? ordered : MOVEABLE
+
   return (
     <div className="gf">
       <style>{CSS}</style>
 
+      {preview && (
+        <div className="gf-previewBar">
+          Previewing unpublished changes. Nobody else sees this yet.
+        </div>
+      )}
+
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="gf-hero">
-        {PROGRAMMES.map((p, i) => (
+        {items.map((p, i) => (
           <div
-            key={p.title + i}
+            key={`${p.title}-${i}`}
             aria-hidden
             className="gf-slide"
             style={{ backgroundImage: `url(${p.img})`, opacity: i === active ? 1 : 0 }}
@@ -83,42 +187,51 @@ export default function Home() {
         <div className="gf-heroInner">
           <header className="gf-header">
             <a href="/" className="gf-brand" onClick={(e) => { e.preventDefault(); scrollTo("top") }}>
-              <span className="gf-wordmark">Gifted</span>
-              <span className="gf-kicker">Olympiad Edu Center</span>
+              <span className="gf-wordmark">{brand.wordmark}</span>
+              <span className="gf-kicker">{brand.kicker}</span>
             </a>
             <nav className="gf-nav">
-              <button onClick={() => scrollTo("programmes")}>Programmes</button>
-              <button onClick={() => scrollTo("steps")}>How it works</button>
-              <button onClick={() => scrollTo("dates")}>Dates</button>
-              <button className="gf-navSignIn" onClick={() => navigate("/login")}>Sign in</button>
+              {list(brand.nav, DEFAULTS.brand.nav).map((n, i) => (
+                <button key={`${n.label}-${i}`} onClick={() => go(n.target)}>{n.label}</button>
+              ))}
+              <button className="gf-navSignIn" onClick={() => navigate("/login")}>
+                {brand.signInLabel || "Sign in"}
+              </button>
             </nav>
           </header>
 
           <div className="gf-heroGrid">
             <div className="gf-heroCopy">
-              <div className="gf-eyebrow">Accra · since 2019</div>
+              {hero.eyebrow && <div className="gf-eyebrow">{hero.eyebrow}</div>}
               <h1 className="gf-h1">
-                Olympiad training,<br />taught by people<br />who have sat it.
+                {headline.map((line, i) => (
+                  <span key={i}>{line}{i < headline.length - 1 && <br />}</span>
+                ))}
               </h1>
-              <p className="gf-lede">
-                Six programmes in maths, physics and computing — live coaching, timed papers
-                and certification students can verify.
-              </p>
+              {hero.lede && <p className="gf-lede">{hero.lede}</p>}
               <div className="gf-cta">
-                <button className="gf-btnGold" onClick={() => scrollTo("dates")}>See open dates</button>
-                <button className="gf-btnGhost" onClick={() => navigate("/login")}>Student sign in</button>
+                {hero.primaryLabel && (
+                  <button className="gf-btnGold" onClick={() => go(hero.primaryTarget)}>
+                    {hero.primaryLabel}
+                  </button>
+                )}
+                {hero.secondaryLabel && (
+                  <button className="gf-btnGhost" onClick={() => go(hero.secondaryTarget)}>
+                    {hero.secondaryLabel}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="gf-index" id="programmes">
-              <div className="gf-indexHead">Programmes</div>
-              {PROGRAMMES.map((p, i) => (
+              <div className="gf-indexHead">{programmes.heading}</div>
+              {items.map((p, i) => (
                 <button
-                  key={p.title + i}
+                  key={`${p.title}-${i}`}
                   className={`gf-row ${i === active ? "is-active" : ""}`}
                   onMouseEnter={() => choose(i)}
                   onFocus={() => choose(i)}
-                  onClick={() => navigate("/login")}
+                  onClick={() => go(p.target || "/login")}
                   aria-current={i === active ? "true" : undefined}
                 >
                   <span className="gf-rowNum">{String(i + 1).padStart(2, "0")}</span>
@@ -130,7 +243,7 @@ export default function Home() {
           </div>
 
           <div className="gf-heroFoot">
-            <p className="gf-activeLine" aria-live="polite">{PROGRAMMES[active].line}</p>
+            <p className="gf-activeLine" aria-live="polite">{current.line}</p>
             <button className="gf-scroll" aria-label="Scroll to programmes" onClick={() => scrollTo("proof")}>
               <span className="gf-chev" />
             </button>
@@ -138,65 +251,11 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Proof ────────────────────────────────────────────────────── */}
-      <section id="proof" className="gf-proof">
-        <div>
-          <div className="gf-stat">12,000</div>
-          <div className="gf-statLabel">Students on the platform</div>
-        </div>
-        <div>
-          <div className="gf-stat">20+</div>
-          <div className="gf-statLabel">Olympiads supported</div>
-        </div>
-        <p className="gf-proofLine">
-          Coaching is run by former olympiad medallists and university faculty, built around
-          the past papers and mark schemes students actually sit.
-        </p>
-      </section>
-
-      {/* ── Steps ────────────────────────────────────────────────────── */}
-      <section id="steps" className="gf-steps">
-        <div className="gf-sectionKicker">How it works</div>
-        {STEPS.map((s) => (
-          <div key={s.n} className="gf-step">
-            <span className="gf-stepNum">{s.n}</span>
-            <h3 className="gf-stepTitle">{s.title}</h3>
-            <p className="gf-stepBody">{s.body}</p>
-          </div>
-        ))}
-      </section>
-
-      {/* ── Dates ────────────────────────────────────────────────────── */}
-      <section id="dates" className="gf-dates">
-        <div className="gf-datesHead">
-          <h2 className="gf-h2">What is open right now.</h2>
-          <p className="gf-datesNote">
-            Places are limited per cohort and close once a sitting is scheduled.
-          </p>
-        </div>
-
-        {EVENTS.map((e) => (
-          <div key={e.name} className="gf-event">
-            <span className="gf-eventTerm">{e.term}</span>
-            <h3 className="gf-eventName">{e.name}</h3>
-            <span className="gf-eventWhat">{e.what}</span>
-            <span className="gf-eventWhen">{e.when}</span>
-            <button className="gf-eventCta" onClick={() => navigate("/sign-up")}>Register</button>
-          </div>
-        ))}
-
-        <footer className="gf-footer">
-          <span className="gf-footBrand">Gifted</span>
-          <a href="mailto:programs@atdp.africa">programs@atdp.africa</a>
-          <a href="tel:+233201856818">+233 20 185 6818</a>
-          <span>East Legon, Accra, Ghana</span>
-          <span className="gf-copy">© 2026 Olympiad Edu Center</span>
-        </footer>
-      </section>
+      {lower.map((k) => blocks[k])}
+      {orphanFooter}
     </div>
   )
 }
-
 // ── Styles ─────────────────────────────────────────────────────────────────
 //
 // Real CSS rather than inline styles so hover, focus-visible and breakpoints
@@ -206,6 +265,11 @@ export default function Home() {
 
 const CSS = `
 .gf{background:${T.navy};color:${T.bone};font-family:${body};-webkit-font-smoothing:antialiased}
+
+/* Preview. Deliberately unmissable: the whole risk of a preview mode is
+   somebody mistaking it for the live page. */
+.gf-previewBar{position:sticky;top:0;z-index:50;background:${T.gold};color:${T.ink};
+  font-size:12.5px;letter-spacing:.02em;text-align:center;padding:9px 16px;font-weight:600}
 .gf *{box-sizing:border-box}
 .gf button{font-family:inherit}
 .gf :focus-visible{outline:2px solid ${T.gold};outline-offset:2px}
