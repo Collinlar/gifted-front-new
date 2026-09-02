@@ -123,6 +123,14 @@ export async function loginUser({ email, password, userName }) {
     localStorage.setItem('interest', JSON.stringify(profile.purpose_of_registration))
   }
 
+  // Anything they registered for as a guest, using this email, becomes theirs.
+  // Done here rather than on the dashboard so the answers are already memory
+  // by the time they open their next form. Never allowed to fail a sign in.
+  try {
+    const { claimGuestRegistrations } = await import('./registrationApi')
+    await claimGuestRegistrations()
+  } catch { /* nothing here is worth blocking a login for */ }
+
   return { success: true, token, user: { ...user, ...profile } }
 }
 

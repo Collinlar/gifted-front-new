@@ -101,7 +101,13 @@ export default function Auth() {
         password: signin.password,
         ...(isEmail ? { email: id } : { userName: id }),
       })
-      if (res.success) navigate("/overview")
+      if (res.success) {
+        // Someone who hit "Sign in first" from a registration form is sent
+        // back to that form, not to the dashboard. Only same-site paths are
+        // followed, so this cannot be used to bounce anyone off the site.
+        const next = new URLSearchParams(window.location.search).get("next")
+        navigate(next && next.startsWith("/") && !next.startsWith("//") ? next : "/overview")
+      }
       else setError(res.message || "Incorrect email or password. Try again.")
     } catch {
       setError("We could not reach the server. Try again in a moment.")

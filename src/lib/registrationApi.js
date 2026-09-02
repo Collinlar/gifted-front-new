@@ -74,6 +74,76 @@ export async function getMyRegistrations() {
   return { registrations: data || [] }
 }
 
+// ── Guests ─────────────────────────────────────────────────────────────────
+//
+// Registering without an account. The account was always meant to make the
+// second form short, not to be the price of entry, but both server functions
+// opened with "Sign in to register" so a guest never even saw the questions.
+//
+// A guest gets a reference and a private token on submit. The token is the
+// only way back to that registration: there is no anon read policy on the
+// table, so a guessed reference reaches nothing. It is kept on this device so
+// they can pay later without digging through their email.
+
+const GUEST_KEY = 'guestRegistrations'
+
+export function rememberGuestRegistration(entry) {
+  try {
+    const all = readGuestRegistrations().filter((r) => r.reference !== entry.reference)
+    all.unshift({ ...entry, savedAt: new Date().toISOString() })
+    localStorage.setItem(GUEST_KEY, JSON.stringify(all.slice(0, 20)))
+  } catch {
+    // A browser refusing storage is not a reason to fail the registration.
+    // They still have the reference on screen and in the return link.
+  }
+}
+
+export function readGuestRegistrations() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]')
+    return Array.isArray(raw) ? raw : []
+  } catch { return [] }
+}
+
+export function forgetGuestRegistrations() {
+  try { localStorage.removeItem(GUEST_KEY) } catch { /* nothing to clear */ }
+}
+
+/** Resume a guest registration from a reference and its token. */
+export async function getGuestRegistration(reference, token) {
+  return unwrap(await supabase.rpc('get_guest_registration', {
+    p_reference: reference,
+    p_token: token,
+  }))
+}
+
+export async function confirmGuestPayment(registrationId, token, reference) {
+  return unwrap(await supabase.rpc('confirm_guest_payment', {
+    p_registration_id: registrationId,
+    p_token: token,
+    p_reference: reference || null,
+  }))
+}
+
+/**
+ * Attach anything registered as a guest with this account's email.
+ *
+ * Called after sign in. Without it, registering as a guest first would opt
+ * someone out of prefill permanently: their answers would live on a row with
+ * no user_id, and every later form would ask for their school again.
+ */
+export async function claimGuestRegistrations() {
+  try {
+    const res = await supabase.rpc('claim_guest_registrations')
+    if (res.error || res.data?.error) return { claimed: 0 }
+    if (res.data?.claimed > 0) forgetGuestRegistrations()
+    return { claimed: res.data?.claimed || 0 }
+  } catch {
+    // Never block a sign in on this
+    return { claimed: 0 }
+  }
+}
+
 /**
  * Record a card payment the student just made.
  *

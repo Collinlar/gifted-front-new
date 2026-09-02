@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useSearchParams } from "react-router-dom"
 import { usePaystackPayment } from "react-paystack"
 import {
   ArrowLeft, CheckCircle2, AlertCircle, Loader2, CreditCard, Clock,
@@ -9,6 +9,9 @@ import {
   initialValue, prefillReason,
 } from "../lib/registrationApi"
 import { getTokenUserId } from "../lib/auth"
+import {
+  rememberGuestRegistration, getGuestRegistration, confirmGuestPayment,
+} from "../lib/registrationApi"
 
 const NAVY = "#003366"
 const MID  = "#336699"
@@ -18,6 +21,12 @@ export default function RegisterProgram() {
   // needs the form's real id, so resolve once and use form.id from then on.
   const { formId: slug } = useParams()
   const navigate = useNavigate()
+  const [search] = useSearchParams()
+
+  // A guest returning to pay arrives on ?ref=...&t=... The reference alone is
+  // not enough to reach anything; the token is what authorises it.
+  const returningRef   = search.get("ref")
+  const returningToken = search.get("t")
 
   const [form, setForm]       = useState(null)
   const [context, setContext] = useState(null)   // profile, memory, existing
@@ -37,6 +46,26 @@ export default function RegisterProgram() {
         const { form: f } = await getForm(slug)
         if (!alive) return
         if (!f) { setError("That registration form is not available."); return }
+
+        // A guest coming back to pay does not need the form again
+        if (returningRef && returningToken) {
+          const existing = await getGuestRegistration(returningRef, returningToken)
+          if (!alive) return
+          setForm(f)
+          setResult({
+            id: existing.id,
+            reference: existing.reference,
+            status: existing.status,
+            paymentStatus: existing.paymentStatus,
+            amount: existing.amount,
+            guest: true,
+            claimToken: returningToken,
+            answers: existing.answers,
+            message: "This is the registration you sent us.",
+            returning: true,
+          })
+          return
+        }
 
         const ctx = await getPrefill(f.id)
         if (!alive) return
@@ -65,7 +94,7 @@ export default function RegisterProgram() {
       }
     })()
     return () => { alive = false }
-  }, [slug])
+  }, [slug, returningRef, returningToken])
 
   const fields = useMemo(
     () => (form?.fields || []).filter((f) => f.key || f.type === "section" || f.type === "info"),
@@ -104,7 +133,26 @@ export default function RegisterProgram() {
 
     setBusy(true); setError("")
     try {
-      setResult(await submitRegistration(form.id, values))
+      const res = await submitRegistration(form.id, values)
+
+      // A guest has no account to look this up from later, so the token that
+      // gets them back to it is kept on this device and shown to them.
+      if (res.guest && res.claimToken) {
+        rememberGuestRegistration({
+          reference: res.reference,
+          token: res.claimToken,
+          id: res.id,
+          slug,
+          formTitle: form.title,
+          amount: res.amount,
+          currency: res.currency || form.fee_currency,
+          paymentStatus: res.paymentStatus,
+        })
+      }
+
+      // Carried through so the payment step has an email to use. A guest has
+      // no profile to read one from.
+      setResult({ ...res, answers: values })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -185,6 +233,25 @@ export default function RegisterProgram() {
             </div>
           )}
 
+          {/* An offer, not a gate. Anyone can register from here; an account
+              only means the next form is shorter. */}
+          {!userId && (
+            <div className="px-6 sm:px-8 py-3 border-b border-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1"
+              style={{ backgroundColor: "#F0F4F8" }}>
+              <p className="text-sm" style={{ color: "#374151" }}>
+                You can register straight away.
+              </p>
+              <button type="button"
+                onClick={() => navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`)}
+                className="text-sm font-semibold underline" style={{ color: NAVY }}>
+                Sign in first
+              </button>
+              <p className="text-sm" style={{ color: MID }}>
+                and we will fill most of this in for you.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={submit} className="px-6 sm:px-8 py-6">
             <div className="grid sm:grid-cols-2 gap-x-4 gap-y-5">
               {fields.map((f) => (
@@ -203,11 +270,16 @@ export default function RegisterProgram() {
                 style={{ backgroundColor: accent }}>
                 {busy ? "Sending your registration..." : "Complete registration"}
               </button>
-              <button type="button" onClick={stash}
-                className="px-5 py-3 rounded-xl font-semibold border border-gray-200"
-                style={{ color: MID }}>
-                Save and finish later
-              </button>
+              {/* Finishing later means coming back to a saved draft, which
+                  needs somewhere to save it. A guest has no account, so the
+                  button is not offered rather than offered and doing nothing. */}
+              {userId && (
+                <button type="button" onClick={stash}
+                  className="px-5 py-3 rounded-xl font-semibold border border-gray-200"
+                  style={{ color: MID }}>
+                  Save and finish later
+                </button>
+              )}
               <span className="text-xs" style={{ color: MID }}>
                 {savedAt ? `Saved at ${savedAt}` : `${answered.done} of ${answered.total} answered`}
               </span>
@@ -328,16 +400,75 @@ function Done({ form, result, navigate, onPaid }) {
 
         {needsPayment && <PayNow form={form} result={result} onPaid={onPaid} />}
 
+        {result.guest && result.claimToken && <GuestReturn result={result} />}
+
         <div className="flex gap-3 justify-center flex-wrap mt-2">
-          <button onClick={() => navigate("/my-registrations")}
-            className="px-5 py-2.5 rounded-xl text-white font-semibold" style={{ backgroundColor: NAVY }}>
-            My registrations
-          </button>
-          <button onClick={() => navigate("/overview")}
-            className="px-5 py-2.5 rounded-xl font-semibold border border-gray-200" style={{ color: MID }}>
-            Back to dashboard
-          </button>
+          {result.guest ? (
+            <>
+              <button onClick={() => navigate("/sign-up")}
+                className="px-5 py-2.5 rounded-xl text-white font-semibold" style={{ backgroundColor: NAVY }}>
+                Create an account
+              </button>
+              <button onClick={() => navigate("/programs")}
+                className="px-5 py-2.5 rounded-xl font-semibold border border-gray-200" style={{ color: MID }}>
+                Browse programmes
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => navigate("/my-registrations")}
+                className="px-5 py-2.5 rounded-xl text-white font-semibold" style={{ backgroundColor: NAVY }}>
+                My registrations
+              </button>
+              <button onClick={() => navigate("/overview")}
+                className="px-5 py-2.5 rounded-xl font-semibold border border-gray-200" style={{ color: MID }}>
+                Back to dashboard
+              </button>
+            </>
+          )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Coming back later ──────────────────────────────────────────────────────
+//
+// The one thing a guest leaves with. A reference on its own reaches nothing,
+// so the link carries the token too, and it is offered as something to copy
+// rather than only kept in this browser's storage, which they might clear.
+
+function GuestReturn({ result }) {
+  const [copied, setCopied] = useState(false)
+  const link = `${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(result.reference)}&t=${encodeURIComponent(result.claimToken)}`
+
+  return (
+    <div className="rounded-xl px-4 py-3.5 mb-5 text-left border" style={{ borderColor: "#E5E7EB" }}>
+      <p className="text-sm font-semibold mb-1" style={{ color: NAVY }}>
+        Keep this link
+      </p>
+      <p className="text-xs mb-2.5" style={{ color: MID }}>
+        It brings you back to this registration to check it or pay, without an account.
+        Sign up with the same email and it moves across on its own.
+      </p>
+      <div className="flex gap-2">
+        <input readOnly value={link}
+          onFocus={(e) => e.target.select()}
+          className="flex-1 min-w-0 text-xs font-mono px-2.5 py-2 rounded-lg border bg-gray-50"
+          style={{ borderColor: "#E5E7EB", color: "#4B5563" }} />
+        <button type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(link)
+              setCopied(true); setTimeout(() => setCopied(false), 2000)
+            } catch {
+              // Clipboard blocked. The field is selectable, which is the fallback.
+            }
+          }}
+          className="px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0"
+          style={{ backgroundColor: NAVY }}>
+          {copied ? "Copied" : "Copy"}
+        </button>
       </div>
     </div>
   )
@@ -354,9 +485,16 @@ function PayNow({ form, result, onPaid }) {
     try { return JSON.parse(localStorage.getItem("user") || "{}") } catch { return {} }
   })()
 
+  // A guest has no profile to take an email from, so it comes from what they
+  // just answered. Paystack refuses a payment without one.
+  const guestEmail = (() => {
+    const a = result.answers || {}
+    return a.email || a.email_address || ""
+  })()
+
   const initialise = usePaystackPayment({
     publicKey: key || "",
-    email: profile.email || "",
+    email: profile.email || guestEmail || "",
     amount: Math.round(Number(form.fee_amount || 0) * 100), // Paystack works in the minor unit
     currency: form.fee_currency || "GHS",
     reference: `${result.reference || "REG"}-${Date.now()}`,
@@ -382,8 +520,18 @@ function PayNow({ form, result, onPaid }) {
           setError(""); setPaying(true)
           initialise({
             onSuccess: async (ref) => {
-              try { await markPaid(result.id, ref.reference || ref.trxref); onPaid() }
-              catch { setError("Payment went through but we could not record it. Contact us with your reference.") }
+              const paid = ref.reference || ref.trxref
+              try {
+                // A guest settles through their token; markPaid needs a session
+                if (result.guest && result.claimToken) {
+                  await confirmGuestPayment(result.id, result.claimToken, paid)
+                } else {
+                  await markPaid(result.id, paid)
+                }
+                onPaid()
+              } catch {
+                setError(`Payment went through but we could not record it. Send us this reference: ${paid}`)
+              }
               finally { setPaying(false) }
             },
             onClose: () => setPaying(false),
