@@ -74,6 +74,30 @@ export async function getMyRegistrations() {
   return { registrations: data || [] }
 }
 
+/**
+ * Does this email or phone already belong to somebody here.
+ *
+ * Almost everyone filling in these forms already exists: 11,198 of the 11,229
+ * accounts came across in the backfill and have never been claimed. Those
+ * people have no way of knowing that, so they register as strangers and the
+ * prefill that would make every later form short never reaches them.
+ *
+ * Returns only { known, claimable }. Never throws: a failed lookup means the
+ * form simply says nothing, which is the same as it did before.
+ */
+export async function lookupAccount({ email, phone }) {
+  try {
+    const { data, error } = await supabase.rpc('lookup_account_status', {
+      p_email: email || null,
+      p_phone: phone || null,
+    })
+    if (error || !data || data.error) return { known: false }
+    return { known: !!data.known, claimable: !!data.claimable }
+  } catch {
+    return { known: false }
+  }
+}
+
 // ── Guests ─────────────────────────────────────────────────────────────────
 //
 // Registering without an account. The account was always meant to make the

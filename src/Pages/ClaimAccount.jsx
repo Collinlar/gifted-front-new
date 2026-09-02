@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Phone, Mail, Lock, Eye, EyeOff,
@@ -78,6 +78,12 @@ function formatJoined(user) {
 
 export default function ClaimAccount() {
   const navigate = useNavigate()
+  // Someone who came here from a registration form is carried back to it
+  // rather than dropped on the dashboard mid-registration.
+  const [claimSearch] = useSearchParams()
+  const nextPath  = claimSearch.get("next")
+  const nextQuery = nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+    ? `?next=${encodeURIComponent(nextPath)}` : ""
   const location = useLocation()
   const prefilledEmail = location.state?.email || ""
 
@@ -292,7 +298,7 @@ export default function ClaimAccount() {
             {step === STEPS.PHONE && (
               <motion.div key="phone" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.25 }}>
                 <button
-                  onClick={() => navigate("/login")}
+                  onClick={() => navigate(`/login${nextQuery}`)}
                   className="flex items-center gap-1 text-sm mb-6 hover:opacity-70"
                   style={{ color: brandColors.primary }}
                 >
@@ -523,7 +529,7 @@ export default function ClaimAccount() {
                   {email}
                 </p>
                 <button
-                  onClick={() => navigate("/login", { state: { email } })}
+                  onClick={() => navigate(`/login${nextQuery}`, { state: { email } })}
                   className="w-full py-3 rounded-lg text-white text-sm font-medium"
                   style={{ backgroundColor: brandColors.primary }}
                 >

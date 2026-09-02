@@ -10,11 +10,35 @@ import {
 } from "../lib/registrationApi"
 import { getTokenUserId } from "../lib/auth"
 import {
-  rememberGuestRegistration, getGuestRegistration, confirmGuestPayment,
+  rememberGuestRegistration, getGuestRegistration, confirmGuestPayment, lookupAccount,
 } from "../lib/registrationApi"
 
 const NAVY = "#003366"
 const MID  = "#336699"
+
+// Half-finished answers, held for this tab only.
+//
+// Offering someone a route out of the form to sign in is only kind if taking
+// it does not cost them what they have already typed. Session rather than
+// local storage because it should not outlive the visit.
+
+const draftKey = (slug) => `registrationInProgress:${slug}`
+
+function keepInProgress(slug, values) {
+  try { sessionStorage.setItem(draftKey(slug), JSON.stringify(values)) }
+  catch { /* a browser refusing storage just means no rescue */ }
+}
+
+function readInProgress(slug) {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(draftKey(slug)) || "null")
+    return raw && typeof raw === "object" ? raw : null
+  } catch { return null }
+}
+
+function clearInProgress(slug) {
+  try { sessionStorage.removeItem(draftKey(slug)) } catch { /* nothing to clear */ }
+}
 
 export default function RegisterProgram() {
   // The URL carries a shareable slug such as KMAC26. Everything downstream
@@ -27,6 +51,11 @@ export default function RegisterProgram() {
   // not enough to reach anything; the token is what authorises it.
   const returningRef   = search.get("ref")
   const returningToken = search.get("t")
+
+  // What we found out about the address they typed, and whether they have
+  // waved it away. Never blocks the form.
+  const [recognised, setRecognised] = useState(null)
+  const [dismissed, setDismissed]   = useState(false)
 
   const [form, setForm]       = useState(null)
   const [context, setContext] = useState(null)   // profile, memory, existing
@@ -78,7 +107,12 @@ export default function RegisterProgram() {
           if (field.type === "section" || field.type === "info") continue
           seeded[field.key] = initialValue(field, ctx)
         }
-        setValues(seeded)
+
+        // Anything they had typed before stepping away to sign in or claim an
+        // account. Offering those routes would be worse than not offering them
+        // if taking one threw away half a filled-in form.
+        const rescued = readInProgress(slug)
+        setValues(rescued ? { ...seeded, ...rescued } : seeded)
 
         if (ctx.existing && !["draft", "submitted"].includes(ctx.existing.status)) {
           setResult({
@@ -110,7 +144,46 @@ export default function RegisterProgram() {
     return { done: done.length, total: real.length }
   }, [fields, values])
 
-  const set = (key, v) => { setValues((p) => ({ ...p, [key]: v })); setError("") }
+  // Going to sign in or claim, and coming back to this exact form with the
+  // answers still in place.
+  const leaveTo = (path) => {
+    keepInProgress(slug, values)
+    navigate(`${path}?next=${encodeURIComponent(window.location.pathname)}`)
+  }
+
+  const set = (key, v) => {
+    setValues((p) => {
+      const next = { ...p, [key]: v }
+      keepInProgress(slug, next)
+      return next
+    })
+    setError("")
+  }
+
+  /**
+   * Ask, once, whether we already know this address.
+   *
+   * Runs when they leave an email or phone box, not on every keystroke: a
+   * half-typed address is not a question worth asking, and this is a lookup
+   * against every account on the platform.
+   */
+  const maybeRecognise = async (field, value) => {
+    if (userId || dismissed || recognised?.known) return
+    const v = String(value || "").trim()
+    if (!v) return
+
+    const isEmail = field.type === "email" || /email/.test(field.key)
+    const isPhone = field.type === "phone" || /phone|mobile/.test(field.key)
+    if (!isEmail && !isPhone) return
+    if (isEmail && !/^\S+@\S+\.\S+$/.test(v)) return
+    if (isPhone && v.replace(/\D/g, "").length < 9) return
+
+    // A parent's address is not the student's account, so those are skipped
+    if (/parent|guardian/.test(field.key)) return
+
+    const res = await lookupAccount(isEmail ? { email: v } : { phone: v })
+    if (res.known) setRecognised({ ...res, value: v, isEmail })
+  }
 
   const stash = async () => {
     if (!userId || !form) return
@@ -149,6 +222,8 @@ export default function RegisterProgram() {
           paymentStatus: res.paymentStatus,
         })
       }
+
+      clearInProgress(slug)
 
       // Carried through so the payment step has an email to use. A guest has
       // no profile to read one from.
@@ -236,18 +311,20 @@ export default function RegisterProgram() {
           {/* An offer, not a gate. Anyone can register from here; an account
               only means the next form is shorter. */}
           {!userId && (
-            <div className="px-6 sm:px-8 py-3 border-b border-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1"
+            <div className="px-6 sm:px-8 py-3 border-b border-gray-100"
               style={{ backgroundColor: "#F0F4F8" }}>
               <p className="text-sm" style={{ color: "#374151" }}>
-                You can register straight away.
-              </p>
-              <button type="button"
-                onClick={() => navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`)}
-                className="text-sm font-semibold underline" style={{ color: NAVY }}>
-                Sign in first
-              </button>
-              <p className="text-sm" style={{ color: MID }}>
-                and we will fill most of this in for you.
+                Carry on and register. If you already have an account,{" "}
+                <button type="button" onClick={() => leaveTo("/login")}
+                  className="font-semibold underline" style={{ color: NAVY }}>
+                  sign in
+                </button>{" "}
+                or{" "}
+                <button type="button" onClick={() => leaveTo("/claim-account")}
+                  className="font-semibold underline" style={{ color: NAVY }}>
+                  claim it
+                </button>{" "}
+                and most of this fills itself in. Nothing you have typed is lost.
               </p>
             </div>
           )}
@@ -256,9 +333,53 @@ export default function RegisterProgram() {
             <div className="grid sm:grid-cols-2 gap-x-4 gap-y-5">
               {fields.map((f) => (
                 <Field key={f.id || f.key} field={f} value={values[f.key]}
-                  reason={prefillReason(f, context)} onChange={(v) => set(f.key, v)} />
+                  reason={prefillReason(f, context)} onChange={(v) => set(f.key, v)}
+                  onBlur={() => maybeRecognise(f, values[f.key])} />
               ))}
             </div>
+
+            {recognised && !dismissed && (
+              <div className="mt-5 rounded-xl border px-4 py-3.5"
+                style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm" style={{ color: "#1E3A8A" }}>
+                    {recognised.claimable
+                      ? "We already have a record of you from before. Claim your account and this form, and every one after it, fills itself in."
+                      : "That already belongs to an account here. Sign in and we will fill the rest in for you."}
+                  </p>
+                  <button type="button" onClick={() => setDismissed(true)}
+                    className="text-xs shrink-0 mt-0.5" style={{ color: MID }}
+                    aria-label="Dismiss">
+                    Not now
+                  </button>
+                </div>
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  {recognised.claimable ? (
+                    <>
+                      <button type="button" onClick={() => leaveTo("/claim-account")}
+                        className="px-4 py-2 rounded-lg text-white text-sm font-semibold"
+                        style={{ backgroundColor: NAVY }}>
+                        Claim my account
+                      </button>
+                      <button type="button" onClick={() => leaveTo("/login")}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold border"
+                        style={{ borderColor: "#BFDBFE", color: NAVY }}>
+                        I already set it up
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => leaveTo("/login")}
+                      className="px-4 py-2 rounded-lg text-white text-sm font-semibold"
+                      style={{ backgroundColor: NAVY }}>
+                      Sign in
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs mt-2.5" style={{ color: "#1E40AF" }}>
+                  Either way you come straight back here and nothing you have typed is lost.
+                </p>
+              </div>
+            )}
 
             {error && (
               <p className="mt-5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>
@@ -293,7 +414,7 @@ export default function RegisterProgram() {
 
 // ── One field ──────────────────────────────────────────────────────────────
 
-function Field({ field, value, reason, onChange }) {
+function Field({ field, value, reason, onChange, onBlur }) {
   if (field.type === "section") {
     return (
       <div className="sm:col-span-2 pt-3 first:pt-0">
@@ -361,7 +482,8 @@ function Field({ field, value, reason, onChange }) {
         </div>
       ) : (
         <input type={field.type === "file" ? "text" : field.type} value={value || ""}
-          onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder || ""}
+          onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+          placeholder={field.placeholder || ""}
           className={base} style={style} />
       )}
 
@@ -399,6 +521,13 @@ function Done({ form, result, navigate, onPaid }) {
         )}
 
         {needsPayment && <PayNow form={form} result={result} onPaid={onPaid} />}
+
+        {form?.post_submit_note && (
+          <p className="text-sm text-left rounded-xl px-4 py-3 mb-5 whitespace-pre-line"
+            style={{ backgroundColor: "#F0F4F8", color: "#374151" }}>
+            {form.post_submit_note}
+          </p>
+        )}
 
         {result.guest && result.claimToken && <GuestReturn result={result} />}
 
@@ -500,12 +629,27 @@ function PayNow({ form, result, onPaid }) {
     reference: `${result.reference || "REG"}-${Date.now()}`,
   })
 
+  // Card payment is not switched on, so this is what almost everyone sees.
+  // What it says comes from the form rather than from here: the old copy
+  // promised a payment link that nothing was going to send.
   if (!key) {
     return (
-      <p className="text-sm rounded-xl px-4 py-3 mb-5 bg-amber-50 border border-amber-200 text-amber-800">
-        Your place is held. Payment of {form.fee_currency} {form.fee_amount} is still due, and we
-        will send you a link to pay.
-      </p>
+      <div className="rounded-xl px-4 py-3.5 mb-5 bg-amber-50 border border-amber-200 text-left">
+        <p className="text-sm text-amber-900">
+          Your place is held. {form.fee_currency} {form.fee_amount} is still to pay.
+        </p>
+        {form.payment_note && (
+          <p className="text-sm text-amber-900 mt-2 whitespace-pre-line">{form.payment_note}</p>
+        )}
+        {form.payment_link_url && (
+          <a href={form.payment_link_url} target="_blank" rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-white text-sm font-semibold"
+            style={{ backgroundColor: "#1D9E75" }}>
+            <CreditCard size={15} />
+            {form.payment_link_label || `Pay ${form.fee_currency} ${form.fee_amount}`}
+          </a>
+        )}
+      </div>
     )
   }
 
@@ -514,6 +658,13 @@ function PayNow({ form, result, onPaid }) {
       <p className="text-sm mb-3" style={{ color: "#4B5563" }}>
         Your place is held. Pay {form.fee_currency} {form.fee_amount} to confirm it.
       </p>
+      {/* Still shown when cards work, because momo remains how most of this
+          money actually arrives */}
+      {form.payment_note && (
+        <p className="text-sm mb-3 text-left whitespace-pre-line" style={{ color: "#4B5563" }}>
+          {form.payment_note}
+        </p>
+      )}
       <button
         disabled={paying}
         onClick={() => {
