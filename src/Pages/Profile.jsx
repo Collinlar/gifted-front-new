@@ -306,11 +306,21 @@ const Profile = () => {
                     backgroundPosition: "center",
                   }}
                 >
+                  {/* z-10 is load bearing.
+                      The avatar block below is the next sibling and carries
+                      -mt-12 on its first child. With no padding-top to stop it,
+                      that margin collapses through and the block's own box
+                      starts 48px higher, over the bottom of the cover. Being
+                      later in the DOM and position:relative, it painted above
+                      this button and swallowed every click, so the icon looked
+                      dead while the profile one beside it worked. */}
                   <button
+                    type="button"
                     onClick={() => coverInputRef.current?.click()}
                     disabled={imageBusy === "cover"}
-                    className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow hover:bg-gray-100 transition-colors disabled:opacity-60"
+                    className="absolute bottom-2 right-2 z-10 h-11 w-11 grid place-items-center bg-white rounded-full shadow hover:bg-gray-100 transition-colors disabled:opacity-60"
                     title="Change cover photo"
+                    aria-label="Change cover photo"
                   >
                     {imageBusy === "cover"
                       ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500" />
@@ -334,11 +344,17 @@ const Profile = () => {
                         <span className="text-2xl font-bold text-white">{getInitials(profile.name)}</span>
                       )}
                     </div>
+                    {/* 28px of white on the avatar, but the tappable area is
+                        stretched to 44px by the pseudo element. Both of these
+                        buttons were under 32px, which is a hard target on a
+                        phone, and most of this traffic is on a phone. */}
                     <button
+                      type="button"
                       onClick={() => profileInputRef.current?.click()}
                       disabled={imageBusy === "profile"}
-                      className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow hover:bg-gray-100 transition-colors border border-gray-200 disabled:opacity-60"
+                      className="absolute bottom-0 right-0 h-7 w-7 grid place-items-center bg-white rounded-full shadow hover:bg-gray-100 transition-colors border border-gray-200 disabled:opacity-60 after:absolute after:content-[''] after:-inset-2"
                       title="Change profile picture"
+                      aria-label="Change profile picture"
                     >
                       {imageBusy === "profile"
                         ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500" />

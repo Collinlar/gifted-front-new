@@ -56,6 +56,11 @@ const SIDEBAR_GROUPS = [
 
 const SIDEBAR_ITEMS = SIDEBAR_GROUPS.flatMap((group) => group.items)
 
+// Matches Tailwind's lg, which is where the aside stops being `fixed`
+const MOBILE_BREAKPOINT = 1024
+const OPEN_WIDTH = 280
+const RAIL_WIDTH = 80
+
 // Mock user data - in a real app this would come from auth context or API
 
 
@@ -63,7 +68,13 @@ const Sidebar = () => {
   // The cart count. Without it, adding something and navigating away leaves
   // no sign anywhere that a cart is waiting.
   const { count: cartCount } = useCart()
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  // Seeded from the viewport rather than defaulting to open. Starting open on
+  // a phone meant the drawer was painted across the screen on every page load
+  // and then animated away, which is a flash of navigation over the content
+  // the person actually asked for.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= MOBILE_BREAKPOINT
+  )
   const [expandedItems, setExpandedItems] = useState({})
   // Labeled groups (Browse Everything, Account) start collapsed — Tracks is the
   // primary path. Remembered per-browser so it doesn't re-collapse every visit.
@@ -84,12 +95,14 @@ const Sidebar = () => {
     })
   }
   const location = useLocation()
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT
+  )
 
   // Responsive handling
   useEffect(() => {
     const checkMobile = () => {
-      const mobileCheck = window.innerWidth < 1024
+      const mobileCheck = window.innerWidth < MOBILE_BREAKPOINT
       setIsMobile(mobileCheck)
       if (mobileCheck) {
         setIsSidebarOpen(false)
@@ -102,6 +115,12 @@ const Sidebar = () => {
     window.addEventListener("resize", checkMobile)
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
+
+  // Tapping a link on a phone should leave the drawer behind. Without this it
+  // stays open over whatever page you just asked for.
+  useEffect(() => {
+    if (isMobile) setIsSidebarOpen(false)
+  }, [location.pathname, isMobile])
 
   // Auto-expand parent items based on current route
   useEffect(() => {
@@ -164,16 +183,32 @@ const Sidebar = () => {
       </AnimatePresence>
 
       {/* Sidebar Container */}
-      <motion.aside
+      {/* Where the drawer sits is CSS, not an animation.
+          It used to be framer's `animate={{ x: isMobile && !isSidebarOpen ?
+          "-100%" : 0 }}`. Two problems. Going from the number 0 to the string
+          "-100%" is a unit change it cannot interpolate. And framer writes
+          these styles from requestAnimationFrame, so whenever frames stop, in a
+          background tab, under low power, or with the page hidden, the element
+          keeps whatever half-finished inline style it had. That is how it ended
+          up parked at 210px across a 375px screen with transform left at none,
+          while the code believed it was closed and drew the open-menu button
+          underneath it.
+
+          Setting the transform directly means the correct position is in the
+          DOM the moment state changes. The transition is decoration: if the
+          browser cannot spare the frames it simply arrives without sliding,
+          which is the right way round for something covering the whole screen.
+
+          Width stays full on mobile too. The 80px rail is a desktop idea, and a
+          half-width drawer over the content is not a state worth having. */}
+      <aside
         className="fixed lg:relative z-30 h-full flex-shrink-0"
-        animate={{
-          width: isSidebarOpen ? "280px" : "80px",
-          x: isMobile && !isSidebarOpen ? "-100%" : 0
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
         style={{
           backgroundColor: brandColors.primary,
-          boxShadow: "4px 0 20px rgba(0, 0, 0, 0.1)"
+          boxShadow: "4px 0 20px rgba(0, 0, 0, 0.1)",
+          width: isMobile ? OPEN_WIDTH : (isSidebarOpen ? OPEN_WIDTH : RAIL_WIDTH),
+          transform: isMobile && !isSidebarOpen ? `translateX(-${OPEN_WIDTH}px)` : "translateX(0)",
+          transition: "transform 260ms ease-out, width 260ms ease-out",
         }}
       >
         <div className="h-full flex flex-col">
@@ -407,7 +442,7 @@ const Sidebar = () => {
             </AnimatePresence>
           </div>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Mobile toggle button (floating) */}
       {isMobile && !isSidebarOpen && (
