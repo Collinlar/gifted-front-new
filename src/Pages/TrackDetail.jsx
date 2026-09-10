@@ -404,6 +404,20 @@ const TrackDetail = () => {
 
   const hiddenByGrade = allActiveItems.length - activeItems.length
 
+  // What each tab's badge says.
+  //
+  // It used to be the raw length of the list before any filtering, so the
+  // Assessments tab read 13 above three cards. People read the badge as a
+  // promise and then went looking for the other ten. It now counts exactly
+  // what that tab will show them, using the same two filters the cards use.
+  const countForTab = (key) => {
+    if (key === 'exams') {
+      return (content.exams || []).filter(isPublished).filter(matchesUserGrade).length
+        + flashcardGroups.length   // shown to every grade, so never filtered out
+    }
+    return (content[key] || []).filter(isPublished).filter(matchesUserGrade).length
+  }
+
   const isExpanded = !!expandedTabs[activeTab]
   const visibleItems = isExpanded ? activeItems : activeItems.slice(0, PAGE_SIZE)
 
@@ -589,10 +603,15 @@ const TrackDetail = () => {
         <div className="flex flex-wrap gap-2 mb-8 border-b pb-px" style={{ borderColor: brandColors.border }}>
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key
-            const count = tab.key === 'exams'
-              ? (content.exams?.length || 0) + flashcardGroups.length
-              : (content[tab.key]?.length || 0)
-            const newCount = tab.key === "exams" ? newExamIds.size : 0
+            const count = countForTab(tab.key)
+            // Only the new ones this student can actually open. The raw set
+            // covers every grade, so a Grade 11 student saw "16 new" above
+            // three cards, which is the same promise the count itself used to
+            // make.
+            const newCount = tab.key === "exams"
+              ? (content.exams || []).filter(isPublished).filter(matchesUserGrade)
+                  .filter((x) => newExamIds.has(x.id)).length
+              : 0
             return (
               <button
                 key={tab.key}

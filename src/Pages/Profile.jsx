@@ -211,14 +211,18 @@ const Profile = () => {
   // Both of these used to end at console.error, so a failed upload was
   // indistinguishable from a button that did nothing. Whatever went wrong now
   // says so on the page.
-  const [imageBusy, setImageBusy]   = useState("")
-  const [imageError, setImageError] = useState("")
+  const [imageBusy, setImageBusy]     = useState("")
+  const [imageError, setImageError]   = useState("")
+  // Which control failed, so the message can name it. Both messages appear in
+  // the same place, and "that picture did not save" beside the avatar is
+  // confusing when it was the cover that failed.
+  const [imageFailed, setImageFailed] = useState("")
 
   const handleProfileImageChange = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
-    setImageError(""); setImageBusy("profile")
+    setImageError(""); setImageFailed(""); setImageBusy("profile")
     try {
       const res = await updateProfilePicture(userId, file)
       if (res.url) {
@@ -232,7 +236,7 @@ const Profile = () => {
         } catch { /* storage refused, the page still shows the new picture */ }
       }
     } catch (err) {
-      setImageError(err.message || "That picture did not save.")
+      setImageFailed("profile"); setImageError(err.message || "That picture did not save.")
     } finally { setImageBusy("") }
   }
 
@@ -240,12 +244,12 @@ const Profile = () => {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
-    setImageError(""); setImageBusy("cover")
+    setImageError(""); setImageFailed(""); setImageBusy("cover")
     try {
       const res = await updateCoverImage(userId, file)
       if (res.url) setProfile((p) => ({ ...p, coverImage: res.url }))
     } catch (err) {
-      setImageError(err.message || "That cover did not save.")
+      setImageFailed("cover"); setImageError(err.message || "That cover did not save.")
     } finally { setImageBusy("") }
   }
 
@@ -345,7 +349,7 @@ const Profile = () => {
 
                   {imageError && (
                     <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 text-center">
-                      {imageError}
+                      {imageFailed === "cover" ? "Cover photo: " : "Profile picture: "}{imageError}
                     </p>
                   )}
 

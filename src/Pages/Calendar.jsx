@@ -194,7 +194,8 @@ export default function Calendar() {
         <div className="grid lg:grid-cols-[1fr_320px] gap-5 items-start">
           <MonthGrid cursor={cursor} setCursor={setCursor} byDay={byDay}
             selected={selected} setSelected={setSelected} />
-          <DayPanel date={selected} events={selectedEvents} />
+          <DayPanel date={selected} events={selectedEvents}
+            upcoming={upcoming} onClear={() => setSelected(null)} />
         </div>
       ) : (
         <Agenda events={upcoming} />
@@ -295,28 +296,45 @@ function MonthGrid({ cursor, setCursor, byDay, selected, setSelected }) {
   )
 }
 
-function DayPanel({ date, events }) {
-  if (!date) {
-    return (
-      <div className="bg-white rounded-2xl border p-6 text-center" style={{ borderColor: A.line }}>
-        <CalendarDays size={22} className="mx-auto mb-2" style={{ color: A.subtle }} />
-        <p className="text-sm" style={{ color: A.mid }}>Tap a day to see what is on it.</p>
-      </div>
-    )
-  }
+// The panel beside the month.
+//
+// It used to sit empty saying "tap a day to see what is on it", which made the
+// most useful part of the screen do nothing until you went hunting. It now
+// opens on what is actually coming up, and only becomes a single day once a
+// day is chosen.
+function DayPanel({ date, events, upcoming = [], onClear }) {
+  const showingDay = Boolean(date)
+  const list = showingDay ? events : upcoming.slice(0, 6)
 
   return (
     <div className="bg-white rounded-2xl border overflow-hidden lg:sticky lg:top-6" style={{ borderColor: A.line }}>
-      <div className="px-5 py-3.5 border-b" style={{ borderColor: A.line }}>
-        <p className="font-bold" style={{ color: A.navy }}>
-          {date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
-        </p>
+      <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3" style={{ borderColor: A.line }}>
+        <div className="min-w-0">
+          <p className="font-bold truncate" style={{ color: A.navy }}>
+            {showingDay
+              ? date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+              : "Coming up"}
+          </p>
+          {!showingDay && (
+            <p className="text-xs mt-0.5" style={{ color: A.subtle }}>
+              Tap any day to see just that day
+            </p>
+          )}
+        </div>
+        {showingDay && (
+          <button onClick={onClear} className="text-xs font-medium shrink-0" style={{ color: A.accent }}>
+            Coming up
+          </button>
+        )}
       </div>
-      {events.length === 0 ? (
-        <p className="text-sm px-5 py-8 text-center" style={{ color: A.subtle }}>Nothing on this day.</p>
+
+      {list.length === 0 ? (
+        <p className="text-sm px-5 py-8 text-center" style={{ color: A.subtle }}>
+          {showingDay ? "Nothing on this day." : "Nothing scheduled from here on."}
+        </p>
       ) : (
         <div className="p-3 space-y-2">
-          {events.map((e) => <EventRow key={e.id} event={e} compact />)}
+          {list.map((e) => <EventRow key={e.id} event={e} compact showDate={!showingDay} />)}
         </div>
       )}
     </div>
@@ -356,7 +374,7 @@ function Agenda({ events }) {
   )
 }
 
-function EventRow({ event: e, compact }) {
+function EventRow({ event: e, compact, showDate }) {
   const { color, Icon } = KINDS[e.kind]
   const left = daysUntil(e.date)
   const soon = left !== null && left >= 0 && left <= 7
@@ -383,6 +401,11 @@ function EventRow({ event: e, compact }) {
           </span>
         </div>
         <p className="text-sm font-semibold leading-snug" style={{ color: A.navy }}>{e.title}</p>
+        {/* In the compact panel there is no date column beside the row, so a
+            list of upcoming items would otherwise say when nothing happens. */}
+        {showDate && (
+          <p className="text-xs mt-0.5" style={{ color: A.mid }}>{shortDate(e.date)}</p>
+        )}
         {e.end && e.end > e.date && (
           <p className="text-xs mt-0.5" style={{ color: A.subtle }}>Runs to {shortDate(e.end)}</p>
         )}

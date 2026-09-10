@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { supabaseAdmin } from './supabaseAdmin'
+import { shrinkImage } from './imageResize'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -74,30 +75,40 @@ export async function updateUserDetails(userId, updates) {
 // stays cached.
 const AVATAR_BUCKET = 'gifted-files'
 
-async function uploadUserImage(userId, file, folder) {
+async function uploadUserImage(userId, file, folder, maxDimension, preferJpeg = false) {
   if (!userId) throw new Error('Sign in again before changing your picture.')
   if (!file.type?.startsWith('image/')) {
-    throw new Error('That file is not an image. Choose a JPG or PNG.')
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error('That image is larger than 5MB. Choose a smaller one.')
+    throw new Error('That file is not an image. Choose a photo instead.')
   }
 
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  // Resized here rather than rejected. A cover photo straight off a phone is
+  // several megabytes, which used to fail a size check and looked to the
+  // person like the button did nothing.
+  const upload = await shrinkImage(file, { maxDimension, preferJpeg })
+
+  const ext = (upload.name.split('.').pop() || 'jpg').toLowerCase()
   const path = `${folder}/${userId}-${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type })
+    .upload(path, upload, { upsert: true, contentType: upload.type })
 
-  if (uploadError) throw new Error(uploadError.message || 'That image did not upload.')
+  if (uploadError) {
+    // Storage returns "The object exceeded the maximum allowed size" for
+    // anything past the bucket ceiling, which means the resize could not
+    // decode it. Say what to do about that rather than repeating the error.
+    if (/exceed|too large|maximum/i.test(uploadError.message || '')) {
+      throw new Error('That picture is too large for us to store. Try a JPG rather than a HEIC or RAW file.')
+    }
+    throw new Error(uploadError.message || 'That image did not upload.')
+  }
 
   const { data: { publicUrl } } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
   return publicUrl
 }
 
 export async function updateProfilePicture(userId, file) {
-  const publicUrl = await uploadUserImage(userId, file, 'profile-pictures')
+  const publicUrl = await uploadUserImage(userId, file, 'profile-pictures', 600)
 
   const { error } = await supabaseAdmin
     .from('users').update({ profile_picture: publicUrl }).eq('id', userId)
@@ -111,7 +122,7 @@ export async function updateProfilePicture(userId, file) {
 }
 
 export async function updateCoverImage(userId, file) {
-  const publicUrl = await uploadUserImage(userId, file, 'cover-images')
+  const publicUrl = await uploadUserImage(userId, file, 'cover-images', 1600, true)
 
   const { error } = await supabaseAdmin
     .from('users').update({ cover_image: publicUrl }).eq('id', userId)
