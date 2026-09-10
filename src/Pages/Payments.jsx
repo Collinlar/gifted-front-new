@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { getMyOrders, confirmOrderPayment, formatMoney } from "../lib/shopApi"
 import { getMyRegistrations, markPaid } from "../lib/registrationApi"
+import PaymentInstructions from "../Components/common/PaymentInstructions"
 import { A, shortDate } from "../lib/appTheme"
 import { Page, PageHead, FilterRow, Empty, Notice, Btn } from "../Components/common/PageShell"
 
@@ -106,7 +107,10 @@ export default function Payments() {
           <p className="text-sm" style={{ color: A.amber }}>Outstanding</p>
           <p className="text-2xl font-bold mt-0.5" style={{ color: A.amber }}>{formatMoney(owed)}</p>
           <p className="text-xs mt-1" style={{ color: A.amber }}>
-            Across {due.length} item{due.length === 1 ? "" : "s"}. Mobile money and card both work.
+            Across {due.length} item{due.length === 1 ? "" : "s"}.
+            {/* Card is not switched on, so the old "card and mobile money both
+                work" line was telling people something untrue. */}
+            {" "}Each one below says how to pay it.
           </p>
         </div>
       )}
@@ -236,11 +240,29 @@ function PayNow({ line, onSettled }) {
     reference: `${line.reference || "PAY"}-${Date.now()}`,
   })
 
+  // Card payment is not switched on, so this is the branch everyone lands in.
+  // It used to say only that we would confirm the payment, with nothing about
+  // how to make one. Registration fees carry the instructions the admin set on
+  // that form; a shop order has no such field, so it keeps a plain line.
   if (!key) {
+    if (line.kind !== "registration") {
+      return (
+        <p className="text-xs" style={{ color: A.mid }}>
+          Card payment is not switched on yet. Send us {line.reference} and we will confirm it.
+        </p>
+      )
+    }
+    const form = line.raw.registration_forms || {}
     return (
-      <p className="text-xs" style={{ color: A.mid }}>
-        Card payment is not switched on yet. Send us {line.reference} and we will confirm it.
-      </p>
+      <PaymentInstructions
+        compact
+        amount={line.amount}
+        currency={line.currency}
+        reference={line.reference}
+        note={form.payment_note}
+        linkUrl={form.payment_link_url}
+        linkLabel={form.payment_link_label}
+      />
     )
   }
 

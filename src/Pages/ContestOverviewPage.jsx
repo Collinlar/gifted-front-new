@@ -70,6 +70,20 @@ const contestData = {
   }
 };
 
+/**
+ * Has this person used up their goes.
+ *
+ * This was `attempts === attemptsAllowed`, with the limit falling back to 0
+ * when none was set. Zero is how the rest of the platform says "no limit", so
+ * that read 0 === 0 and locked every uncapped contest for everyone who had
+ * never attempted it. Equality is the wrong test even with a real cap: anyone
+ * who somehow got one attempt past it would come out unexhausted again.
+ */
+function attemptsUsedUp(attempts, allowed) {
+  const cap = Number(allowed) || 0;
+  return cap > 0 && Number(attempts) >= cap;
+}
+
 export default function ContestOverview() {
   const navigate = useNavigate()
   // const [contest] = useState(contestData);
@@ -162,7 +176,7 @@ export default function ContestOverview() {
         setUserScore(currentUserEntry.score);
         const attemptsMade = currentUserEntry.attemptsMade || 0
         setUserAttempts(attemptsMade)
-        setIsAttemptsExhausted(attemptsMade >= getAttemptsAllowed())
+        setIsAttemptsExhausted(attemptsUsedUp(attemptsMade, getAttemptsAllowed()))
         console.log("User rank:", currentUserEntry.rank, "User score:", currentUserEntry.score);
       } else {
         setUserRank(null);
@@ -199,23 +213,11 @@ export default function ContestOverview() {
       const attempts = response.attempts?.length || 0;
       setUserAttempts(attempts);
       
-      // Check if attempts are exhausted - when userAttempts equals attemptsAllowed
-      const attemptsAllowed = getAttemptsAllowed();
-      const isExhausted = attempts === attemptsAllowed;
-      setIsAttemptsExhausted(isExhausted);
-      
-      console.log(`[DEBUG] User attempts: ${attempts}, Allowed: ${attemptsAllowed}, Exhausted: ${isExhausted}`);
-      console.log(`[DEBUG] Contest object:`, { attemptsAllowed: contest.attemptsAllowed, maxAttempts: contest.maxAttempts });
+      setIsAttemptsExhausted(attemptsUsedUp(attempts, getAttemptsAllowed()));
     } catch (error) {
       console.error("Error fetching user attempts:", error);
-      const attempts = 0;
-      setUserAttempts(attempts);
-      
-      const attemptsAllowed = getAttemptsAllowed();
-      const isExhausted = attempts === attemptsAllowed;
-      setIsAttemptsExhausted(isExhausted);
-      
-      console.log(`[DEBUG FALLBACK] User attempts: ${attempts}, Allowed: ${attemptsAllowed}, Exhausted: ${isExhausted}`);
+      setUserAttempts(0);
+      setIsAttemptsExhausted(attemptsUsedUp(0, getAttemptsAllowed()));
     }
   };
 
@@ -414,7 +416,9 @@ export default function ContestOverview() {
                       </li>
                       <li className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                        Maximum {getAttemptsAllowed()} attempts allowed
+                        {getAttemptsAllowed() > 0
+                          ? `Maximum ${getAttemptsAllowed()} attempts allowed`
+                          : "Retake this as many times as you like"}
                       </li>
                       <li className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
@@ -460,10 +464,13 @@ export default function ContestOverview() {
                       <div>
                         <h3 className="font-semibold text-green-900 mb-2 text-lg">Attempts Available</h3>
                         <p className="text-green-800 mb-3">
-                          You have {getAttemptsAllowed() - userAttempts} attempt(s) remaining for this contest.
+                          {getAttemptsAllowed() > 0
+                            ? `You have ${getAttemptsAllowed() - userAttempts} attempt(s) remaining for this contest.`
+                            : "There is no limit on how many times you can take this contest."}
                         </p>
                         <div className="text-sm text-green-700">
-                          <strong>Your attempts:</strong> {userAttempts} / {getAttemptsAllowed()}
+                          <strong>Your attempts:</strong> {userAttempts}
+                          {getAttemptsAllowed() > 0 && <> / {getAttemptsAllowed()}</>}
                         </div>
                       </div>
                     </div>

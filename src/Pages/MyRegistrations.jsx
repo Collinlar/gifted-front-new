@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { usePaystackPayment } from "react-paystack"
 import { getMyRegistrations, getOpenFormsForMe, markPaid } from "../lib/registrationApi"
+import PaymentInstructions from "../Components/common/PaymentInstructions"
 
 const NAVY = "#003366"
 const MID  = "#336699"
@@ -244,9 +245,18 @@ function PayRow({ registration: r, form, onPaid }) {
           {busy ? "Opening payment..." : `Pay ${form.fee_currency || "GHS"} ${r.amount}`}
         </button>
       ) : (
-        <p className="text-xs text-amber-800">
-          Your place is held. We will send you payment details.
-        </p>
+        // Card payment is not switched on, so this is what almost everyone
+        // sees. It used to promise that we would send payment details, which
+        // left them owing money with no way to pay it.
+        <PaymentInstructions
+          compact
+          amount={r.amount}
+          currency={form.fee_currency || "GHS"}
+          reference={r.reference}
+          note={form.payment_note}
+          linkUrl={form.payment_link_url}
+          linkLabel={form.payment_link_label}
+        />
       )}
 
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}

@@ -67,7 +67,13 @@ export async function saveDraft(formId, userId, answers) {
 export async function getMyRegistrations() {
   const { data, error } = await supabase
     .from('registrations')
-    .select('*, registration_forms(title, program_title, fee_currency, closes_at)')
+    // The payment fields come along so My Registrations and Payments can show
+    // the same instructions the confirmation screen does. Without them both
+    // screens could say what was owed but not how to pay it.
+    .select(`*, registration_forms(
+      title, program_title, fee_currency, closes_at,
+      payment_note, payment_link_url, payment_link_label
+    )`)
     .order('created_at', { ascending: false })
 
   if (error) throw error

@@ -61,37 +61,61 @@ export async function updateUserDetails(userId, updates) {
   return { success: true, user: normalizeUser(data) }
 }
 
-export async function updateProfilePicture(userId, file) {
-  const ext = file.name.split('.').pop()
-  const path = `profile-pictures/${userId}.${ext}`
+// Profile and cover pictures.
+//
+// These uploaded into a bucket called `avatars`, which does not exist on this
+// project and never has. Every attempt failed with "Bucket not found", the
+// page logged it to the console and said nothing, so the button looked dead.
+// The bucket everything else uses is gifted-files.
+//
+// The path carries a timestamp rather than overwriting one fixed name. The
+// bucket is public and served through a CDN, so replacing the bytes behind a
+// URL someone has already loaded shows them the old picture for as long as it
+// stays cached.
+const AVATAR_BUCKET = 'gifted-files'
+
+async function uploadUserImage(userId, file, folder) {
+  if (!userId) throw new Error('Sign in again before changing your picture.')
+  if (!file.type?.startsWith('image/')) {
+    throw new Error('That file is not an image. Choose a JPG or PNG.')
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('That image is larger than 5MB. Choose a smaller one.')
+  }
+
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${folder}/${userId}-${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from('avatars')
-    .upload(path, file, { upsert: true })
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { upsert: true, contentType: file.type })
 
-  if (uploadError) throw uploadError
+  if (uploadError) throw new Error(uploadError.message || 'That image did not upload.')
 
-  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+  const { data: { publicUrl } } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+  return publicUrl
+}
 
+export async function updateProfilePicture(userId, file) {
+  const publicUrl = await uploadUserImage(userId, file, 'profile-pictures')
+
+  const { error } = await supabaseAdmin
+    .from('users').update({ profile_picture: publicUrl }).eq('id', userId)
+  if (error) throw new Error(error.message || 'Uploaded, but we could not save it to your profile.')
+
+  // Secondary record. A failure here must not lose them the picture they can
+  // already see, so it is not allowed to throw.
   await supabaseAdmin.from('profile_images').upsert({ user_id: userId, url: publicUrl })
-  await supabaseAdmin.from('users').update({ profile_picture: publicUrl }).eq('id', userId)
 
   return { success: true, url: publicUrl }
 }
 
 export async function updateCoverImage(userId, file) {
-  const ext = file.name.split('.').pop()
-  const path = `cover-images/${userId}.${ext}`
+  const publicUrl = await uploadUserImage(userId, file, 'cover-images')
 
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from('avatars')
-    .upload(path, file, { upsert: true })
-
-  if (uploadError) throw uploadError
-
-  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
-
-  await supabaseAdmin.from('users').update({ cover_image: publicUrl }).eq('id', userId)
+  const { error } = await supabaseAdmin
+    .from('users').update({ cover_image: publicUrl }).eq('id', userId)
+  if (error) throw new Error(error.message || 'Uploaded, but we could not save it to your profile.')
 
   return { success: true, url: publicUrl }
 }
@@ -476,10 +500,113 @@ export async function sendFeedback({ quiz, feedback }) {
   return { success: true }
 }
 
+/**
+ * Record one sitting.
+ *
+ * The caller passes camelCase, the table is snake_case, so every upsert since
+ * the migration failed with "Could not find the 'correctAnswers' column". The
+ * newest row in quiz_reviews predates that by months. Mapped explicitly here
+ * rather than at the call site so there is one place to get it right.
+ */
 export async function saveQuizReview(reviewData) {
-  const { error } = await supabaseAdmin.from('quiz_reviews').upsert(reviewData)
+  const userId = reviewData.userId ?? reviewData.user_id
+  const quizId = reviewData.quizId ?? reviewData.quiz_id
+
+  // Attempts are a running count on the row, so read the current one first
+  const { data: existing } = await supabaseAdmin
+    .from('quiz_reviews')
+    .select('id, attempts_made')
+    .eq('user_id', userId)
+    .eq('quiz_id', quizId)
+    .maybeSingle()
+
+  const row = {
+    user_id:             userId,
+    quiz_id:             quizId,
+    score:               reviewData.score,
+    date:                reviewData.date,
+    year:                reviewData.year,
+    correct_answers:     reviewData.correctAnswers     ?? reviewData.correct_answers,
+    number_of_questions: reviewData.numberOfQuestions  ?? reviewData.number_of_questions,
+    review:              reviewData.review,
+    full_name:           reviewData.fullName  ?? reviewData.full_name,
+    grade:               reviewData.grade,
+    school:              reviewData.school,
+    email:               reviewData.email,
+    attempts_made:       (Number(existing?.attempts_made) || 0) + 1,
+    updated_at:          new Date().toISOString(),
+  }
+  if (existing?.id) row.id = existing.id
+
+  // Undefined keys would be sent as nulls and wipe columns this call knows
+  // nothing about, so they are dropped instead.
+  Object.keys(row).forEach((k) => row[k] === undefined && delete row[k])
+
+  const { error } = await supabaseAdmin.from('quiz_reviews').upsert(row)
   if (error) throw error
   return { success: true }
+}
+
+/**
+ * Every id this person is known by.
+ *
+ * The backfill left attempts scattered across three: the Supabase auth uuid,
+ * the old Supabase id, and the original Mongo ObjectId. getUserHistory already
+ * gathers all three, which is why History showed attempts that the assessment
+ * page reported as zero.
+ */
+function knownUserIds(userId) {
+  const legacyId = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_user_id') : null
+  const mongoId  = typeof localStorage !== 'undefined' ? localStorage.getItem('legacy_mongo_id') : null
+  return [...new Set([userId, legacyId, mongoId].filter(Boolean))]
+}
+
+/**
+ * How many times this person has actually sat this assessment.
+ *
+ * Counted from `assessments`, which holds one row per attempt keyed by the
+ * exam uuid and is the table History reads. quiz_reviews is consulted only as
+ * a fallback for pre-migration history: every one of its 3,028 rows is keyed
+ * by Mongo ids, so the old lookup by auth uuid and exam uuid never matched a
+ * single row and the page showed 0 for everybody.
+ *
+ * @param quizMongoId the exam's legacy id, so attempts made before the
+ *                    migration still count towards the limit
+ */
+export async function fetchQuizAttempts(userId, quizId, quizMongoId = null) {
+  const ids = knownUserIds(userId)
+  if (ids.length === 0 || !quizId) return { attemptsMade: 0 }
+
+  const quizIds = [...new Set([quizId, quizMongoId].filter(Boolean))]
+
+  const [live, legacy] = await Promise.allSettled([
+    supabaseAdmin
+      .from('assessments')
+      .select('id, details')
+      .in('user_id', ids),
+    supabaseAdmin
+      .from('quiz_reviews')
+      .select('attempts_made')
+      .in('user_id', ids)
+      .in('quiz_id', quizIds),
+  ])
+
+  let made = 0
+  if (live.status === 'fulfilled') {
+    made = (live.value.data || []).filter((row) =>
+      quizIds.includes(row?.details?.quizId)
+    ).length
+  }
+
+  // attempts_made is a counter on the row, not a row per attempt, so this is
+  // the highest value rather than a count.
+  if (legacy.status === 'fulfilled') {
+    const most = (legacy.value.data || [])
+      .reduce((n, r) => Math.max(n, Number(r.attempts_made) || 0), 0)
+    made = Math.max(made, most)
+  }
+
+  return { attemptsMade: made }
 }
 
 export async function fetchQuizReview(userId, quizId) {

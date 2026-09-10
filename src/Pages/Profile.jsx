@@ -208,28 +208,45 @@ const Profile = () => {
 
   // ─── Image upload handlers ─────────────────────────────────────────────────
 
+  // Both of these used to end at console.error, so a failed upload was
+  // indistinguishable from a button that did nothing. Whatever went wrong now
+  // says so on the page.
+  const [imageBusy, setImageBusy]   = useState("")
+  const [imageError, setImageError] = useState("")
+
   const handleProfileImageChange = async (e) => {
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) return
+    setImageError(""); setImageBusy("profile")
     try {
       const res = await updateProfilePicture(userId, file)
-      if (res.url) setProfileImage(res.url)
+      if (res.url) {
+        setProfileImage(res.url)
+        // The sidebar and the header read the picture from here
+        try {
+          const stored = JSON.parse(localStorage.getItem("user") || "{}")
+          localStorage.setItem("user", JSON.stringify({
+            ...stored, profile_picture: res.url, profilePicture: res.url,
+          }))
+        } catch { /* storage refused, the page still shows the new picture */ }
+      }
     } catch (err) {
-      console.error("Profile image update failed:", err)
-    }
-    e.target.value = ""
+      setImageError(err.message || "That picture did not save.")
+    } finally { setImageBusy("") }
   }
 
   const handleCoverImageChange = async (e) => {
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) return
+    setImageError(""); setImageBusy("cover")
     try {
       const res = await updateCoverImage(userId, file)
       if (res.url) setProfile((p) => ({ ...p, coverImage: res.url }))
     } catch (err) {
-      console.error("Cover image update failed:", err)
-    }
-    e.target.value = ""
+      setImageError(err.message || "That cover did not save.")
+    } finally { setImageBusy("") }
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -287,10 +304,13 @@ const Profile = () => {
                 >
                   <button
                     onClick={() => coverInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow hover:bg-gray-100 transition-colors"
+                    disabled={imageBusy === "cover"}
+                    className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow hover:bg-gray-100 transition-colors disabled:opacity-60"
                     title="Change cover photo"
                   >
-                    <Camera size={16} className="text-gray-600" />
+                    {imageBusy === "cover"
+                      ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500" />
+                      : <Camera size={16} className="text-gray-600" />}
                   </button>
                   <input type="file" accept="image/*" ref={coverInputRef} className="hidden" onChange={handleCoverImageChange} />
                 </div>
@@ -312,13 +332,22 @@ const Profile = () => {
                     </div>
                     <button
                       onClick={() => profileInputRef.current?.click()}
-                      className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow hover:bg-gray-100 transition-colors border border-gray-200"
+                      disabled={imageBusy === "profile"}
+                      className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow hover:bg-gray-100 transition-colors border border-gray-200 disabled:opacity-60"
                       title="Change profile picture"
                     >
-                      <Camera size={12} className="text-gray-600" />
+                      {imageBusy === "profile"
+                        ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500" />
+                        : <Camera size={12} className="text-gray-600" />}
                     </button>
                     <input type="file" accept="image/*" ref={profileInputRef} className="hidden" onChange={handleProfileImageChange} />
                   </div>
+
+                  {imageError && (
+                    <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 text-center">
+                      {imageError}
+                    </p>
+                  )}
 
                   <div className="text-center mb-4">
                     <h2 className="text-lg font-bold" style={{ color: brandColors.primary }}>{profile.name || "—"}</h2>

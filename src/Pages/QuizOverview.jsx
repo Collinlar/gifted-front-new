@@ -2,7 +2,7 @@ import { getTokenUserId } from "../lib/auth";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchQuizReview, getExam } from "../lib/api";
+import { fetchQuizAttempts, getExam } from "../lib/api";
 import {
   ArrowLeft, Clock, ListChecks, RotateCcw, CheckCircle2,
   AlertTriangle, Play, Info,
@@ -44,23 +44,26 @@ export default function QuizOverview() {
 
     const load = async () => {
       // Refresh the assessment and the attempt history together
-      const [fresh, review] = await Promise.allSettled([
-        getExam(quizId),
-        localStorage.getItem("token")
-          ? fetchQuizReview(getTokenUserId(), quizId)
-          : Promise.resolve({ review: { attemptsMade: 0 } }),
-      ]);
-
+      const fresh = await getExam(quizId).catch((e) => {
+        console.error("Could not refresh this assessment:", e);
+        return null;
+      });
       if (!alive) return;
 
       // Keep the passed object if the refetch fails, so a network blip shows a
       // slightly stale page rather than nothing at all.
-      if (fresh.status === "fulfilled" && fresh.value?.exam) setQuizData(fresh.value.exam);
-      else if (fresh.status === "rejected") console.error("Could not refresh this assessment:", fresh.reason);
+      const exam = fresh?.exam || quizData;
+      if (fresh?.exam) setQuizData(fresh.exam);
 
-      setQuizReview(
-        review.status === "fulfilled" ? review.value.review || { attemptsMade: 0 } : { attemptsMade: 0 }
-      );
+      // Needs the exam in hand: attempts made before the migration are filed
+      // under the exam's old Mongo id, not its uuid.
+      const attempts = localStorage.getItem("token")
+        ? await fetchQuizAttempts(getTokenUserId(), quizId, exam?.mongo_id || exam?.mongoId)
+            .catch(() => ({ attemptsMade: 0 }))
+        : { attemptsMade: 0 };
+
+      if (!alive) return;
+      setQuizReview(attempts);
       setLoading(false);
     };
 

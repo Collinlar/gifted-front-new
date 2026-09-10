@@ -122,7 +122,12 @@ export default function MyLibrary() {
           <Section title="Assessments and practice" items={assessments} icon={FileText}
             onOpen={(i) => {
               localStorage.setItem("id", i.item_id)
-              navigate("/quiz-overview", { state: { id: i.item_id } })
+              // QuizOverview reads location.state.questions and takes the id
+              // off it. Handing it { id } left it with no quiz to fetch and it
+              // rendered an empty assessment.
+              navigate("/quiz-overview", {
+                state: { questions: { id: i.item_id, _id: i.item_id, title: i.title } },
+              })
             }}
             cta="Start" />
 
