@@ -12,7 +12,6 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { getQuizDetails, getAllLearningResourceAnalytics, getUserDetails, getUserTracks, getTrackContent } from "../lib/api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { jwtDecode } from "jwt-decode";
 import AnnouncementsSection from "./AnnouncementsSection";
 import OpenRegistrations from "./OpenRegistrations";
 
@@ -288,9 +287,15 @@ const OverviewPage = () => {
     setShowOnboarding(false);
   };
 
+  // These three read the signed-in user through getTokenUserId rather than
+  // jwtDecode directly. Decoding inline threw InvalidTokenError on every
+  // mount for anyone without the retired localStorage token, which is now
+  // everyone, and React's double invoke in development doubled it again.
   useEffect(()=>{
     const loadAssessmentAnalytics = async()=>{
-      const response = await getQuizDetails(jwtDecode(localStorage.getItem("token")).sub)
+      const userId = getTokenUserId()
+      if(!userId) return
+      const response = await getQuizDetails(userId)
       if(response.success && response.quizDetails.length>0){
         setAssessment(()=>{return [...response.quizDetails]})
       }
@@ -300,7 +305,9 @@ const OverviewPage = () => {
   },[])
   useEffect(()=>{
     const loadLearningAnalytics = async()=>{
-      const response = await getAllLearningResourceAnalytics(jwtDecode(localStorage.getItem("token")).sub)
+      const userId = getTokenUserId()
+      if(!userId) return
+      const response = await getAllLearningResourceAnalytics(userId)
       if(response.success && response.analytics.length>0){
         setLearningResources(()=>{return [...response.analytics]})
       }
@@ -314,7 +321,9 @@ const OverviewPage = () => {
     setLoadExaminations(true);
     const LoadUserExamination = async () => {
       try {
-        const response = await getUserDetails(jwtDecode(localStorage.getItem("token")).sub);
+        const userId = getTokenUserId();
+        if (!userId) { setLoadExaminations(false); return; }
+        const response = await getUserDetails(userId);
         if (response.success) {
           localStorage.setItem("purpose", JSON.stringify(response.user.purposeOfRegistration));
           
@@ -346,7 +355,7 @@ const OverviewPage = () => {
             });
 
 
-            const totalRegisteredPrograms = programs.filter(item=> item.registered.includes(jwtDecode(localStorage.getItem("token"))?.sub))
+            const totalRegisteredPrograms = programs.filter(item=> item.registered.includes(userId))
             setRegisteredPrograms(totalRegisteredPrograms.length)
             console.log(totalRegisteredPrograms)
             console.log(programs)

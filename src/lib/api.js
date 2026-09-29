@@ -778,27 +778,11 @@ export async function getAllGroups() {
   return { success: true, groups: data }
 }
 
-export async function getChannelFeed(channelId) {
-  const { data, error } = await supabaseAdmin
-    .from('channel_feeds')
-    .select('*, users(first_name, last_name, profile_picture)')
-    .eq('channel_id', channelId)
-    .order('created_at', { ascending: true })
-
-  if (error) throw error
-  return { success: true, messages: data }
-}
-
-export async function sendMessage(formData) {
-  const { error } = await supabaseAdmin.from('messages').insert({
-    channel_id: formData.get('channelId'),
-    content: formData.get('content'),
-    user_id: formData.get('userId'),
-  })
-
-  if (error) throw error
-  return { success: true }
-}
+// getChannelFeed and sendMessage lived here. The channel chat was retired in
+// September 2026: its realtime push ran on a Render service that only ever
+// allowed an old Vercel preview origin, so it had not worked from the live
+// domain in months. The channel_feeds and messages tables are untouched, so
+// bringing it back is re-adding these two queries.
 
 // ─── Leaderboard / Contests ────────────────────────────────────────────────────
 

@@ -40,7 +40,6 @@ import Question from "./Pages/Question"
 import QuizOverview from "./Pages/QuizOverview";
 import ProgramsPage from "./Pages/Programs";
 import CourseViewPage from "./Pages/CoursePage";
-import ChannelFeed from "./Pages/ChannelFeed";
 import CalendarPage from "./Pages/Calendar";
 import Payments from "./Pages/Payments";
 import Checkout from "./Pages/checkOut";
@@ -77,8 +76,6 @@ import Leaderboard from "./Pages/Leaderboard";
 
 import PathwayLandingPage from "./Pages/PathwayLandingPage"
 import BeginnersPathwayDetail from "./Pages/BeginnersPathwayDetail";
-import ExamModePage from "./Pages/ExamMode";
-import ExamLogin from "./Pages/ExamLogin";
 import VerifyPayment from "./Pages/VerifyPayment"
 import ClaimAccount from "./Pages/ClaimAccount";
 
@@ -219,7 +216,6 @@ function App() {
 				<Route element={<ProgramsPage competition={competitions}/>} path="/programs"/>
 				<Route element={<CourseViewPage/>} path="/course-view"/>
 
-				<Route element={<ChannelFeed/>} path="/channel-page"/>
 				{/* Payments replaces the old Invoice screen, whose Pay button
 				    marked a row paid without taking any money. The old path is
 				    kept pointing here so existing links and bookmarks land
@@ -263,8 +259,6 @@ function App() {
 
 				<Route path="/pathway" element={<PathwayLandingPage />} />
 				<Route path="/beginner-pathway" element={<BeginnersPathwayDetail />} />
-				<Route path="/exam/:id" element={<ExamModePage/>}/>
-				<Route path="/exam-login" element={<ExamLogin/>}/>
 
 				{/* <Route path="/google-analytics-tracking" element={<useGATracking/>}/> */}
 				

@@ -2,7 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
-# SPA fallback: serve index.html for all routes so React Router handles navigation
+# SPA fallback: serve index.html for all routes so React Router handles
+# navigation. Files that actually exist in the publish directory are served
+# before this rule is consulted, which is what keeps robots.txt and
+# sitemap.xml as themselves. Do not add force = true here: it would make every
+# one of them return the app shell again.
 [[redirects]]
   from = "/*"
   to = "/index.html"

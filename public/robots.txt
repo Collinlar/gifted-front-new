@@ -1,0 +1,32 @@
+# Gifted Olympiad Edu Center
+# giftededu.tech
+
+User-agent: *
+Allow: /
+
+# Signed-in surfaces. Nothing here renders without a session, so a crawler
+# only ever gets an empty shell and burns crawl budget doing it.
+Disallow: /overview
+Disallow: /profile
+Disallow: /my-registrations
+Disallow: /my-library
+Disallow: /payments
+Disallow: /invoice-page
+Disallow: /checkout
+Disallow: /history
+Disallow: /quiz-questions
+Disallow: /quiz-overview
+Disallow: /practice
+Disallow: /contest-page
+Disallow: /review-assessment
+Disallow: /review-course
+Disallow: /user-details
+Disallow: /claim-account
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /verify-payment
+
+# Live exam sittings. These carry candidate access codes in the path.
+Disallow: /exam/
+
+Sitemap: https://giftededu.tech/sitemap.xml

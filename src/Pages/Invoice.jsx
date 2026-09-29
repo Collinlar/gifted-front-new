@@ -3,7 +3,8 @@ import { useNavigate } from "react-router";
 import { verifyRegistration as verifyReg, getUserDetails, registerProgram, registerForCompetition } from "../lib/api";
 import { jwtDecode } from "jwt-decode";
 import { getTokenUserId } from "../lib/auth";
-import toast, { Toaster } from "react-hot-toast";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // axios.defaults.timeout = 10000; // Prevent infinite hanging requests
 
@@ -130,7 +131,7 @@ const Invoice = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 w-full flex items-center justify-center pt-20 pb-10 px-6">
-      <Toaster position="top-center" />
+      <ToastContainer position="top-center" />
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-blue-100 p-8">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-blue-900">{`${subItem.name}-${subItem.year}`}</h1>

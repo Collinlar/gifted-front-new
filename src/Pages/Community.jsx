@@ -381,7 +381,6 @@ export default function Community() {
 
 // Regular Community Card Component
 function CommunityCard({ community }) {
-  const navigate = useNavigate()
   return (
     <motion.div
       variants={{
@@ -440,19 +439,6 @@ function CommunityCard({ community }) {
           </div>
         </div>
 
-        <div className="flex justify-between items-center">
-          <button
-            className="px-4 py-2 rounded-lg font-medium transition-colors"
-            style={{
-              backgroundColor: brandColors.accent,
-              color: brandColors.white,
-            }}
-            onClick={()=>{navigate("/channel-page",{state:community.name});localStorage.setItem("channelId",community._id)}}
-          >
-            Join Now
-          </button>
-         
-        </div>
       </div>
     </motion.div>
   )
