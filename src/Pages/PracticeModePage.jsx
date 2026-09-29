@@ -9,6 +9,7 @@ import {
   savePracticeSession,
 } from '../lib/api'
 import { generateHint, generateExplanation } from '../lib/practiceAI'
+import QuestionImage from "../Components/common/QuestionImage"
 
 // Strip HTML tags from question text
 function stripHtml(html) {
@@ -349,14 +350,24 @@ export default function PracticeModePage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
           >
-            {/* Question text */}
+            {/* Question text and its picture */}
             <div className="mb-4">
               <div className="text-xs font-semibold uppercase tracking-wider text-teal-600 mb-2">
                 Question {currentIndex + 1}
               </div>
-              <h2 className="text-xl font-semibold text-gray-800 leading-relaxed">
-                {stripHtml(current.question)}
-              </h2>
+
+              {/* Half of all practice questions carry one of these and none of
+                  them were being drawn, so students were answering questions
+                  about diagrams they could not see. */}
+              <QuestionImage src={current.image} title={current.imageTitle} />
+
+              {/* Some questions are the picture, with no text at all. An empty
+                  heading under the diagram just adds a gap. */}
+              {stripHtml(current.question).trim() && (
+                <h2 className="text-xl font-semibold text-gray-800 leading-relaxed">
+                  {stripHtml(current.question)}
+                </h2>
+              )}
             </div>
 
             {/* Hint — available before answering when hints are enabled */}

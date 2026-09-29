@@ -25,6 +25,7 @@ import {
 import { useLocation , useNavigate} from 'react-router-dom';
 import { addScore } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
+import QuestionImage from "../Components/common/QuestionImage"
 
 
 // Brand colors
@@ -948,9 +949,16 @@ export default function ContestPage() {
                           </span>
                         </div>
                         
-                        <h2 className="text-2xl font-bold mb-4" style={{ color: brandColors.primary }}>
-                          {stripHtmlTags(question.question)}
-                        </h2>
+                        {/* No contest carries a picture today, but every other
+                            paper type does, and this renderer would have
+                            dropped it the moment one did. */}
+                        <QuestionImage src={question.image} title={question.imageTitle} />
+
+                        {stripHtmlTags(question.question).trim() && (
+                          <h2 className="text-2xl font-bold mb-4" style={{ color: brandColors.primary }}>
+                            {stripHtmlTags(question.question)}
+                          </h2>
+                        )}
                       </div>
                       
                       <div className="text-right">

@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle, MinusCircle, Award, Download, BadgeCheck } from "lucide-react"
+import QuestionImage from "../Components/common/QuestionImage"
 
 const NAVY = "#003366"
 const MID  = "#336699"
@@ -93,6 +94,9 @@ export default function ExamResults({ results, onClose }) {
                         : <XCircle size={16} className="text-red-500" />}
                   </span>
                   <div className="flex-1 min-w-0">
+                    {/* 44 exam questions are a diagram with no text at all, so
+                        without this the row reads "Q12." and nothing else. */}
+                    <QuestionImage src={q.image} title={q.imageTitle} maxHeight="12rem" lazy />
                     <p className="text-sm mb-1" style={{ color: "#1F2937" }}>
                       <span className="font-semibold" style={{ color: MID }}>Q{i + 1}.</span>{" "}
                       <span dangerouslySetInnerHTML={{ __html: q.question }} />
