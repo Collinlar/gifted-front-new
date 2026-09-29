@@ -51,7 +51,6 @@ import InvoiceChannel from "./Pages/InvoiceChannel";
 import Profile from "./Pages/Profile";
 import InvoiceAssessment from "./Pages/InvoiceAssessment";
 import InvoiceCourse from "./Pages/InvoiceCourse";
-import { jwtDecode } from "jwt-decode";
 import ForgotPassword from "./Pages/ForgotPassword";
 import ResetPasswordPage from "./Pages/ResetPassword";
 

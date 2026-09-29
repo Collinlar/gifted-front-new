@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { verifyRegistration as verifyReg, getUserDetails, registerProgram, registerForCompetition } from "../lib/api";
-import { jwtDecode } from "jwt-decode";
 import { getTokenUserId } from "../lib/auth";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -29,8 +28,9 @@ const Invoice = () => {
   const competitionCourses = subItem.courses
   const competitionAssessment = subItem.Assessment
 
-  const token = localStorage.getItem("token");
-  const decodedToken = token ? jwtDecode(token) : {};
+  // Was jwtDecode(token).id, which is undefined on a Supabase JWT, so every
+  // registration and lookup below went out with no user attached.
+  const userId = getTokenUserId();
 
   const handleAssessmentCheck = (e) => {
     const { checked } = e.target;
@@ -49,7 +49,7 @@ const Invoice = () => {
   useEffect(() => {
     const verifyRegistration = async () => {
       try {
-        const response = await verifyReg(decodedToken.id, subItem.name);
+        const response = await verifyReg(userId, subItem.name);
         if (response.success) {
           setRegistered(response.registered);
           setRegisterDetails(response.registration);
@@ -67,7 +67,7 @@ const Invoice = () => {
   useEffect(() => {
     const loadUserDetails = async () => {
       try {
-        const response = await getUserDetails(decodedToken?.id);
+        const response = await getUserDetails(userId);
         if (response.success && registered) {
           const found = response.user.Paid?.find(
             (item) => item.name === `${subItem.name}-${subItem.year}`
@@ -88,7 +88,7 @@ const Invoice = () => {
 
     try {
       const payload = {
-        userId: decodedToken.id,
+        userId,
         program: subItem.name,
         year: subItem.year,
         grade: grade,

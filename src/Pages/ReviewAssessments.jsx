@@ -1,7 +1,6 @@
 import { getTokenUserId } from "../lib/auth";
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
 import { getExam, fetchQuizReview } from '../lib/api';
 
 const ReviewAssessments = () => {

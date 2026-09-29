@@ -3,7 +3,6 @@ import { getTokenUserId } from "../lib/auth";
 
 import React, { useEffect, useState } from "react";
 import { verifyPayment as verifyPaymentApi } from "../lib/api";
-import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 
 export default function VerifyPayment() {

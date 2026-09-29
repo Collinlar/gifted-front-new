@@ -1,7 +1,6 @@
 import { getTokenUserId } from "../lib/auth";
 import React, { useEffect, useState } from 'react';
 import { getQuizDetails, fetchAllScores, getAllCoursesInfo } from '../lib/api';
-import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -34,16 +33,9 @@ const ResultPage = () => {
     loadAssessmentAnalytics();
   }, []);
 
-  const getDecodedUserId = () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return null;
-      const decoded = jwtDecode(token);
-      return decoded?.id ?? null;
-    } catch (e) {
-      return null;
-    }
-  };
+  // Was jwtDecode(token).id. A Supabase JWT carries the user in `sub`, so
+  // `id` was always undefined and everything keyed off this matched nothing.
+  const getDecodedUserId = () => getTokenUserId();
 
   const isTimedChallenge = (item) => {
     return Boolean(

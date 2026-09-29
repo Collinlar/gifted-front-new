@@ -18,7 +18,6 @@ import AI from "../Components/images/AI.jpg"
 import CyberSecurity from "../Components/images/3849223.jpg"
 import Renewable from "../Components/images/7314.jpg"
 import { getFeaturedExams } from "../lib/api"
-import { jwtDecode } from "jwt-decode"
 
 // Brand colors
 const brandColors = {

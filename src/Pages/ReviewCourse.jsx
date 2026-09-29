@@ -2,7 +2,6 @@ import { getTokenUserId } from "../lib/auth";
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchCourseReview } from "../lib/api";
-import { jwtDecode } from "jwt-decode";
 
 export default function ReviewCourse() {
   const userId = getTokenUserId();

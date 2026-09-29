@@ -9,9 +9,8 @@ import {
   Lock, Activity, GraduationCap, Target, Key,
   Award, ArrowRight, CheckCircle, AlertCircle,
 } from "lucide-react"
-import { jwtDecode } from "jwt-decode"
 import { getUserDetails, updateUserDetails, updateProfilePicture, updateCoverImage } from "../lib/api"
-import { resetPassword, getTokenUserId } from "../lib/auth"
+import { resetPassword, getTokenUserId, getStoredProfile } from "../lib/auth"
 
 const brandColors = {
   primary: "#103254",
@@ -91,19 +90,22 @@ const Profile = () => {
           setUserDetails(res.user)
           setProfileImage(res.user.profile_picture || res.user.profilePicture || null)
 
-          const token = localStorage.getItem("token")
-          const decoded = token ? jwtDecode(token) : null
+          // These fallbacks were read off the JWT, which carries none of
+          // them: a Supabase token has no name, category, mobile or country.
+          // The profile row cached at sign in does, so it stands in instead.
+          const cached = getStoredProfile()
           const createdAt = res.user.created_at || res.user.createdAt
           const joined = createdAt
             ? new Date(createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
             : ""
 
           setProfile({
-            name: `${res.user.firstName || ""} ${res.user.lastName || ""}`.trim() || decoded?.name || "",
-            email: res.user.email || decoded?.email || "",
-            role: res.user.category || res.user.Category || decoded?.category || "Student",
-            phone: res.user.mobileNumber || decoded?.mobile || "",
-            location: res.user.country || decoded?.location || "",
+            name: `${res.user.firstName || ""} ${res.user.lastName || ""}`.trim()
+                  || `${cached.firstName || ""} ${cached.lastName || ""}`.trim(),
+            email: res.user.email || cached.email || "",
+            role: res.user.category || res.user.Category || cached.category || "Student",
+            phone: res.user.mobileNumber || cached.mobileNumber || "",
+            location: res.user.country || cached.country || "",
             joined,
             coverImage: res.user.cover_image || res.user.coverImage || null,
           })

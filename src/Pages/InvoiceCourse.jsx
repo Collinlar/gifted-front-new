@@ -5,7 +5,6 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { BookOpen, ChevronRight, Clock, Search, Star, Users } from "lucide-react"
 import { getCourse } from "../lib/api"
-import { jwtDecode } from "jwt-decode"
 import { useNavigate, useLocation} from "react-router-dom"
 // Brand colors
 const brandColors = {

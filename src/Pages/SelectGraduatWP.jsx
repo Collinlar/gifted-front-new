@@ -6,7 +6,6 @@ import axios from "axios";
 import { registerUser } from "../lib/auth";
 import { getAllInterests } from "../lib/api";
 import { ToastContainer, toast } from 'react-toastify';
-import { jwtDecode } from "jwt-decode";
 
 // Brand colors
 const brandColors = {

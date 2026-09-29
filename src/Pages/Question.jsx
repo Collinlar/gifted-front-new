@@ -1,6 +1,5 @@
 import { getTokenUserId } from "../lib/auth";
 import { sendFeedback, sendAssessmentAnalytics, addExamRecord, saveQuizReview } from "../lib/api";
-import { jwtDecode } from "jwt-decode";
 // import { extname } from "path";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

@@ -6,7 +6,7 @@ import {
   Star
 } from 'lucide-react';
 import { getTimedChallenge, addScore } from "../lib/api"
-import { jwtDecode } from 'jwt-decode'
+import { getTokenUserId, getStoredProfile } from '../lib/auth'
 
 function TimedChallenge() {
   const navigate = useNavigate();
@@ -129,12 +129,15 @@ function TimedChallenge() {
   useEffect(() => {
     const postScore = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-        const decoded = jwtDecode(token);
-        const userId = decoded?.id;
-        const firstName = decoded?.firstName || '';
-        const lastName = decoded?.lastName || '';
+        // A Supabase JWT carries `sub` and nothing else useful: no id, no
+        // first or last name. Every score posted from here went up with an
+        // undefined user and a blank name. The id comes from the token, the
+        // name from the profile row cached at sign in.
+        const userId = getTokenUserId();
+        if (!userId) return;
+        const profile = getStoredProfile();
+        const firstName = profile.firstName || '';
+        const lastName = profile.lastName || '';
         const userName = `${firstName} ${lastName}`.trim();
         const courseId = localStorage.getItem("courseId");
         const totalCorrectAnswers = score;

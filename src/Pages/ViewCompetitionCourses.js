@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchCourseProgress as fetchCourseProgressApi, fetchCourseInfo } from '../lib/api'
+import { getTokenUserId } from '../lib/auth'
 import { motion } from "framer-motion"
 import { ArrowRight, BookOpen, Clock } from "lucide-react"
 
@@ -17,10 +18,12 @@ const CompetitionAssessments = () => {
   // Function to fetch course progress
     const fetchCourseProgress = async (courseId) => {
       try {
-        const token = localStorage.getItem("token")
-        if (!token) return false
-        
-        const userId = jwtDecode(token).id
+        // This called jwtDecode without ever importing it, so it threw
+        // ReferenceError straight into the catch below and every course
+        // reported no progress. Even imported, `id` is undefined on a
+        // Supabase JWT, where the user is `sub`.
+        const userId = getTokenUserId()
+        if (!userId) return false
         const response = await fetchCourseProgressApi(userId, courseId)
         return response.progress?.moduleStatus &&
                response.progress.moduleStatus.some(module => module.completed === true)
