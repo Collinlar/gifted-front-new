@@ -1,8 +1,8 @@
 import { CheckCircle2, XCircle, MinusCircle, Award, Download, BadgeCheck } from "lucide-react"
 import QuestionImage from "../Components/common/QuestionImage"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 // Where the certificate PDF is served from. The admin deployment hosts the
 // renderer, so point this at it if the admin site ever moves.

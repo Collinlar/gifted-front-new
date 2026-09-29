@@ -8,7 +8,7 @@ const POS_KEY = "ACCESS_BAR_POSITION"
 const COLLAPSE_KEY = "ACCESS_BAR_COLLAPSED"
 
 const brandColors = {
-	primary: "#003366",
+	primary: "#103254",
 	white: "#FFFFFF",
 }
 

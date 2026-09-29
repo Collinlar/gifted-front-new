@@ -1,12 +1,18 @@
 // Design tokens for the Gifted marketing and auth surfaces.
 //
-// This is a separate visual language from the signed-in app: editorial, square
+// A separate visual language from the signed-in app: editorial, square
 // cornered, bone and gold on deep navy. Kept in one place so the homepage and
 // the auth page cannot drift apart.
+//
+// The navy itself is shared, not separate. It lives in lib/navy.js and the app
+// reads the same ramp, so the blue does not change the moment a student signs
+// in. Only the typography, the spacing and the gold belong to this file.
+
+import { NAVY } from "../lib/navy"
 
 export const T = {
   ink:        "#08182A", // deepest navy, page base
-  navy:       "#0B1F33", // panel navy
+  navy:       NAVY[900], // panel navy, the anchor the whole ramp is built on
   bone:       "#F6F5F2", // primary text on dark, section background
   boneWarm:   "#FFFDFA", // warmest section background
   gold:       "#E8A33D",

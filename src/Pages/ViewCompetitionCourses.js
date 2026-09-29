@@ -94,7 +94,7 @@ function FeaturedCourseCard({ course, index, hasCourseProgress }) {
         show: { opacity: 1, y: 0 },
       }}
       transition={{ duration: 0.4 }}
-      whileHover={{ y: -8, boxShadow: "0 20px 40px -15px rgba(0, 51, 102, 0.15)" }}
+      whileHover={{ y: -8, boxShadow: "0 20px 40px -15px rgba(16, 50, 84, 0.15)" }}
       className="bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300 flex flex-col h-full"
     >
       <div className="relative h-48 overflow-hidden">
@@ -181,7 +181,7 @@ function CourseCard({ course, index, hasCourseProgress }) {
         hidden: { opacity: 0, y: 20 },
         show: { opacity: 1, y: 0 },
       }}
-      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(0, 51, 102, 0.15)" }}
+      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(16, 50, 84, 0.15)" }}
       className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 flex flex-col h-full"
       style={{ border: `1px solid ${brandColors.accent}10` }}
     >

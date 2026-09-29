@@ -4,10 +4,10 @@ import { storeContext } from '../Context';
 
 // Brand colors to maintain consistency
 const brandColors = {
-  darkBlue: '#001D3D',
-  mediumBlue: '#003566',
-  navy: '#000814',
-  lightBlue: '#EEF2F6',
+  darkBlue: '#0B1E32',
+  mediumBlue: '#103356',
+  navy: '#040A10',
+  lightBlue: '#EDF2F7',
   white: '#FFFFFF',
   gray: '#F3F4F6',
 };

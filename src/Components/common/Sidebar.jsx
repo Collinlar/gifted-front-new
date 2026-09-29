@@ -5,15 +5,16 @@ import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import { Activity, BookOpen, ChevronRight, HelpCircle, Home, Menu, Calendar, Compass, Clock, ClipboardList, ShoppingBag, Library, Receipt, Trophy } from "lucide-react"
 import { useCart } from "../../store/CartContext"
+import GiftedLogo from "./GiftedLogo"
 
 // Brand colors with additional shades for consistency
 const brandColors = {
-  primary: "#003366",
-  primaryLight: "#004080",
-  secondary: "#336699",
-  secondaryLight: "#4080BF",
-  accent: "#6699CC",
-  accentLight: "#85B8E5",
+  primary: "#103254",
+  primaryLight: "#14406C",
+  secondary: "#2666A6",
+  secondaryLight: "#347FCB",
+  accent: "#6199D1",
+  accentLight: "#8FB5DB",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",
@@ -216,25 +217,14 @@ const Sidebar = () => {
           <div className="flex items-center justify-between p-5 pb-4 border-b"
             style={{ borderColor: brandColors.secondary }}
           >
-            <AnimatePresence>
-              {isSidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="flex items-center gap-2"
-                >
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center"
-                    style={{ backgroundColor: brandColors.accent }}
-                  >
-                    <Home size={18} color={brandColors.white} />
-                  </div>
-                  <span className="text-xl font-bold text-white">
-                    Gifted
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* The real mark, in the bone finish because the sidebar is navy.
+                The 80px rail has room for the menu button and nothing else, so
+                the lockup only appears once the sidebar is at full width. */}
+            {(isMobile || isSidebarOpen) && (
+              <Link to="/overview" className="flex items-center" aria-label="Gifted, go to overview">
+                <GiftedLogo variant="lockup" tone="bone" height={30} />
+              </Link>
+            )}
 
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Route, Clock, Users, BookOpen, CheckCircle, ArrowRight, Star, Target, Trophy, Play, ChevronRight, Code, Palette, PenTool, Calculator, Lightbulb, Award, Globe, Zap, Brain, Rocket, Filter, Search, User, Calendar, ChevronLeft, ChevronDown, Flame, TrendingUp, Medal, Lock, Unlock, FileText, Video, Gift, Shield, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import GiftedLogo from "../Components/common/GiftedLogo"
 
 const PathwayLearningPage = () => {
   const [currentView, setCurrentView] = useState('landing');
@@ -356,11 +357,8 @@ const PathwayLearningPage = () => {
             <span>Back to Overview</span>
           </button>
           <div className="text-center flex-1">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl">G</span>
-              </div>
-              <h1 className="text-4xl font-bold text-gray-900">Gifted</h1>
+            <div className="flex items-center justify-center mb-4">
+              <GiftedLogo variant="lockup" height={48} />
             </div>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Choose your learning journey and unlock your potential with personalized tracks designed to help you excel.

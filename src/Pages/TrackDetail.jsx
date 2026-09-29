@@ -7,8 +7,8 @@ import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markE
 import { getTokenUserId } from "../lib/auth"
 
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
+  primary: "#103254",
+  secondary: "#2666A6",
   background: "#F0F4F8",
   border: "#E5E7EB",
   success: "#1D9E75",
@@ -31,7 +31,7 @@ const formatDateRange = (start, end) => {
 
 const CONTEST_COLOR   = "#E8A020"
 const PRACTICE_COLOR  = "#1D9E75"
-const EXAM_COLOR      = "#185FA5"
+const EXAM_COLOR      = "#215E9C"
 const FLASHCARD_COLOR = "#7C3AED"
 
 const MODE_BADGE = {

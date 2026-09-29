@@ -5,7 +5,7 @@ import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 const brandColors = {
-  primary: "#003366",
+  primary: "#103254",
   background: "#F0F4F8",
 }
 
@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
   const strengthConfig = {
     weak:   { label: "Too short", color: "#EF4444", width: "25%" },
     fair:   { label: "Fair",      color: "#F59E0B", width: "50%" },
-    good:   { label: "Good",      color: "#3B82F6", width: "75%" },
+    good:   { label: "Good",      color: "#2A6EB2", width: "75%" },
     strong: { label: "Strong",    color: "#10B981", width: "100%" },
   };
 

@@ -150,14 +150,14 @@ const ResultPage = () => {
       >
         <div className="mb-6 flex flex-col gap-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-bold text-[#003366]">
+            <h2 className="text-3xl font-bold text-[#103254]">
               {activeTab === 'assessments' && 'Assessment Results'}
               {activeTab === 'timedChallenge' && 'Timed Challenge Scores'}
               {activeTab === 'leaderboard' && 'Leaderboard'}
             </h2>
             <button
               onClick={() => navigate("/overview")}
-              className="px-4 py-2 bg-[#003366] text-white text-sm font-medium rounded-lg hover:bg-[#002244] transition"
+              className="px-4 py-2 bg-[#103254] text-white text-sm font-medium rounded-lg hover:bg-[#002244] transition"
             >
               Back to Dashboard
             </button>
@@ -166,19 +166,19 @@ const ResultPage = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('assessments')}
-              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'assessments' ? 'bg-[#003366] text-white border-[#003366]' : 'bg-white text-[#003366] border-gray-300'}`}
+              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'assessments' ? 'bg-[#103254] text-white border-[#103254]' : 'bg-white text-[#103254] border-gray-300'}`}
             >
               Assessments
             </button>
             <button
               onClick={() => setActiveTab('timedChallenge')}
-              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'timedChallenge' ? 'bg-[#003366] text-white border-[#003366]' : 'bg-white text-[#003366] border-gray-300'}`}
+              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'timedChallenge' ? 'bg-[#103254] text-white border-[#103254]' : 'bg-white text-[#103254] border-gray-300'}`}
             >
               Timed Challenge
             </button>
             <button
               onClick={() => setActiveTab('leaderboard')}
-              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'leaderboard' ? 'bg-[#003366] text-white border-[#003366]' : 'bg-white text-[#003366] border-gray-300'}`}
+              className={`px-3 py-2 rounded-md text-sm font-medium border ${activeTab === 'leaderboard' ? 'bg-[#103254] text-white border-[#103254]' : 'bg-white text-[#103254] border-gray-300'}`}
             >
               Leaderboard
             </button>
@@ -208,7 +208,7 @@ const ResultPage = () => {
                         >
                           <CheckCircle className="w-5 h-5" />
                         </div>
-                        <h3 className="text-xl font-semibold text-[#003366]">
+                        <h3 className="text-xl font-semibold text-[#103254]">
                           {assessment.title}
                         </h3>
                       </div>
@@ -219,7 +219,7 @@ const ResultPage = () => {
 
                     <div className="flex justify-between items-center mt-2">
                       <div className="text-sm text-gray-600">
-                        Score: <span className="font-semibold text-[#003366]">{assessment.score}%</span> • Questions: {assessment.totalQuestions}
+                        Score: <span className="font-semibold text-[#103254]">{assessment.score}%</span> • Questions: {assessment.totalQuestions}
                       </div>
                       <button
                         onClick={() =>
@@ -227,7 +227,7 @@ const ResultPage = () => {
                             state: { quizId: assessment.quizId },
                           })
                         }
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#003366] text-white hover:bg-[#002244] transition"
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#103254] text-white hover:bg-[#002244] transition"
                       >
                         View Results
                       </button>
@@ -261,7 +261,7 @@ const ResultPage = () => {
                         <div className="p-2 rounded-full mr-3 bg-purple-100 text-purple-700">
                           <CheckCircle className="w-5 h-5" />
                         </div>
-                        <h3 className="text-xl font-semibold text-[#003366]">
+                        <h3 className="text-xl font-semibold text-[#103254]">
                           {assessment.title}
                         </h3>
                       </div>
@@ -272,7 +272,7 @@ const ResultPage = () => {
 
                     <div className="flex justify-between items-center mt-2">
                       <div className="text-sm text-gray-600">
-                        Score: <span className="font-semibold text-[#003366]">{assessment.score}%</span> • Questions: {assessment.totalQuestions}
+                        Score: <span className="font-semibold text-[#103254]">{assessment.score}%</span> • Questions: {assessment.totalQuestions}
                       </div>
                       <button
                         onClick={() =>
@@ -280,7 +280,7 @@ const ResultPage = () => {
                             state: { quizId: assessment.quizId },
                           })
                         }
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#003366] text-white hover:bg-[#002244] transition"
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#103254] text-white hover:bg-[#002244] transition"
                       >
                         View Results
                       </button>
@@ -309,7 +309,7 @@ const ResultPage = () => {
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-gray-600">
                     {typeof currentUserIndex === 'number' && currentUserIndex >= 0 && (
-                      <span className="inline-block font-medium bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 text-[#003366] px-3 py-2 rounded-md">
+                      <span className="inline-block font-medium bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 text-[#103254] px-3 py-2 rounded-md">
                         Your position: <span className="font-semibold">{currentUserIndex + 1}</span> / {filteredLeaderboard.length}
                       </span>
                     )}
@@ -358,11 +358,11 @@ const ResultPage = () => {
                               ? 'bg-[#C0C0C0] text-[#3A3A3A]'
                               : rank === 3
                               ? 'bg-[#CD7F32] text-white'
-                              : 'bg-blue-100 text-[#003366]';
+                              : 'bg-blue-100 text-[#103254]';
                           return (
                             <tr
                               key={index}
-                              className={`${isCurrentUser ? 'ring-2 ring-[#003366] ring-inset' : ''} odd:bg-white even:bg-gray-50 hover:bg-indigo-50 transition-colors`}
+                              className={`${isCurrentUser ? 'ring-2 ring-[#103254] ring-inset' : ''} odd:bg-white even:bg-gray-50 hover:bg-indigo-50 transition-colors`}
                             >
                               <td className="px-4 py-3 whitespace-nowrap text-sm">
                                 <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${rankBadgeClass}`}>
@@ -380,7 +380,7 @@ const ResultPage = () => {
                                       style={{ width: `${scoreVal}%` }}
                                     />
                                   </div>
-                                  <span className="min-w-[2.5rem] text-right font-semibold text-[#003366]">{scoreVal}</span>
+                                  <span className="min-w-[2.5rem] text-right font-semibold text-[#103254]">{scoreVal}</span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm">

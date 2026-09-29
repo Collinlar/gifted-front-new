@@ -7,8 +7,8 @@ import {
   examGetPaper, examSaveProgress, examHeartbeat, examLogEvent, examSubmit,
 } from "../lib/examApi"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 const HEARTBEAT_MS = 20000  // server truth for the clock
 const AUTOSAVE_MS  = 15000

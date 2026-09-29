@@ -6,12 +6,12 @@ import { ArrowDownRight, ArrowUpRight, ExternalLink, Star } from "lucide-react"
 
 // Brand colors with additional shades
 const brandColors = {
-  primary: "#003366",
-  primaryLight: "#004080",
-  secondary: "#336699",
-  secondaryLight: "#4080BF",
-  accent: "#6699CC",
-  accentLight: "#85B8E5",
+  primary: "#103254",
+  primaryLight: "#14406C",
+  secondary: "#2666A6",
+  secondaryLight: "#347FCB",
+  accent: "#6199D1",
+  accentLight: "#8FB5DB",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",

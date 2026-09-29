@@ -7,13 +7,13 @@ import { getAllTracks, getUserTracks, setUserTracks, getTrackContent } from "../
 import { getTokenUserId } from "../lib/auth"
 
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
+  primary: "#103254",
+  secondary: "#2666A6",
   background: "#F0F4F8",
   border: "#E5E7EB",
 }
 
-const FALLBACK_COLORS = ["#336699", "#1D9E75", "#E8A020", "#185FA5", "#9333EA", "#DB2777", "#0EA5E9"]
+const FALLBACK_COLORS = ["#2666A6", "#1D9E75", "#E8A020", "#215E9C", "#9333EA", "#DB2777", "#2A6EB2"]
 const fallbackColorFor = (index) => FALLBACK_COLORS[index % FALLBACK_COLORS.length]
 
 const SkeletonCard = () => (

@@ -18,15 +18,15 @@ import OpenRegistrations from "./OpenRegistrations";
 
 // Brand colors
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
-  accent: "#6699CC",
+  primary: "#103254",
+  secondary: "#2666A6",
+  accent: "#6199D1",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",
 };
 
-const ONBOARDING_ACCENT = "#003366";
+const ONBOARDING_ACCENT = "#103254";
 
 const OnboardingWizard = ({ isVisible, onClose, onComplete, navigate }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -131,7 +131,7 @@ const OnboardingWizard = ({ isVisible, onClose, onComplete, navigate }) => {
 // One column of the "What's Next" cross-track feed on the dashboard.
 const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, tab, navigate }) => (
   <div className="bg-white rounded-xl shadow-md p-5">
-    <h3 className="flex items-center gap-2 font-semibold text-[#003366] mb-4">
+    <h3 className="flex items-center gap-2 font-semibold text-[#103254] mb-4">
       {icon}
       {title}
     </h3>
@@ -143,13 +143,13 @@ const FeedColumn = ({ title, icon, items, emptyLabel, renderMeta, tab, navigate 
           <button
             key={item.id}
             onClick={() => navigate(`/track/${item.trackSlug}`, { state: { tab } })}
-            className="w-full text-left rounded-lg border border-gray-100 p-3 hover:border-[#336699] hover:shadow-sm transition-all"
+            className="w-full text-left rounded-lg border border-gray-100 p-3 hover:border-[#2666A6] hover:shadow-sm transition-all"
           >
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.trackColor || "#336699" }} />
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.trackColor || "#2666A6" }} />
               <span className="text-xs text-gray-400">{item.trackName}</span>
             </div>
-            <p className="text-sm font-medium text-[#003366] line-clamp-1">{item.title || item.name}</p>
+            <p className="text-sm font-medium text-[#103254] line-clamp-1">{item.title || item.name}</p>
             {renderMeta && <p className="text-xs text-gray-500 mt-0.5">{renderMeta(item)}</p>}
           </button>
         ))}
@@ -247,7 +247,7 @@ const OverviewPage = () => {
             : null
           stats.push({
             name: t.name,
-            color: t.color || "#336699",
+            color: t.color || "#2666A6",
             competitions: res.competitions.length,
             courses: res.courses.length,
             exams: res.exams.length,
@@ -436,8 +436,8 @@ const OverviewPage = () => {
           transition={{ duration: 0.6 }}
         >
           <p className="font-bold">{`${localStorage.getItem("isReturningSession") === "true" ? "Welcome back" : "Hello"} ${JSON.parse(localStorage.getItem("user") || "{}").first_name || JSON.parse(localStorage.getItem("user") || "{}").firstName || "there"}`}</p>
-          <h1 className="text-4xl font-bold mb-4 text-[#003366]">Dashboard Overview</h1>
-          <p className="text-lg text-[#336699] max-w-2xl mx-auto">
+          <h1 className="text-4xl font-bold mb-4 text-[#103254]">Dashboard Overview</h1>
+          <p className="text-lg text-[#2666A6] max-w-2xl mx-auto">
             Track your programs, access learning resources, and take assessments all in one place.
           </p>
         </motion.div>
@@ -453,12 +453,12 @@ const OverviewPage = () => {
         <div className="mb-10">
           {myTracks.length > 0 ? (
             <div>
-              <h2 className="text-xl font-semibold text-[#003366] mb-4">Continue Your Track</h2>
+              <h2 className="text-xl font-semibold text-[#103254] mb-4">Continue Your Track</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {myTracks.map((track, i) => {
                   const newCount = newCountsByTrack[track.id] || 0
                   const stats = trackStats.find((s) => s.name === track.name)
-                  const color = track.color || ["#336699", "#1D9E75", "#E8A020", "#185FA5", "#9333EA"][i % 5]
+                  const color = track.color || ["#2666A6", "#1D9E75", "#E8A020", "#215E9C", "#9333EA"][i % 5]
                   return (
                     <button
                       key={track.id}
@@ -478,7 +478,7 @@ const OverviewPage = () => {
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-[#003366] mb-1">{track.name}</p>
+                        <p className="font-semibold text-[#103254] mb-1">{track.name}</p>
                         {stats ? (
                           <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
                             <span>{stats.competitions} competitions</span>
@@ -505,7 +505,7 @@ const OverviewPage = () => {
                 })}
                 <button
                   onClick={() => navigate("/tracks")}
-                  className="rounded-2xl border border-dashed border-gray-300 p-5 hover:border-[#336699] transition-all text-gray-400 flex flex-col items-center justify-center gap-1 min-h-[160px]"
+                  className="rounded-2xl border border-dashed border-gray-300 p-5 hover:border-[#2666A6] transition-all text-gray-400 flex flex-col items-center justify-center gap-1 min-h-[160px]"
                 >
                   <Plus className="h-5 w-5" />
                   <span className="text-sm font-medium">Manage tracks</span>
@@ -515,12 +515,12 @@ const OverviewPage = () => {
           ) : (
             <div className="bg-white rounded-xl shadow-md p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-[#003366]">Choose your tracks</h2>
+                <h2 className="text-lg font-semibold text-[#103254]">Choose your tracks</h2>
                 <p className="text-sm text-gray-500 mt-1">Pick the subjects you're interested in to get a personalized path through Olympiads, camps, resources and assessments.</p>
               </div>
               <button
                 onClick={() => navigate("/tracks")}
-                className="px-5 py-2.5 rounded-lg bg-[#003366] text-white font-medium hover:bg-[#002347] transition-colors whitespace-nowrap"
+                className="px-5 py-2.5 rounded-lg bg-[#103254] text-white font-medium hover:bg-[#0B1F33] transition-colors whitespace-nowrap"
               >
                 Choose Tracks
               </button>
@@ -530,13 +530,13 @@ const OverviewPage = () => {
 
         {/* What's Next — cross-track feed, replaces the old Programs/Learning/Assessments tabs */}
         <div className="mb-10">
-          <h2 className="text-xl font-semibold text-[#003366] mb-4">What's Next</h2>
+          <h2 className="text-xl font-semibold text-[#103254] mb-4">What's Next</h2>
           {myTracks.length === 0 ? (
             <div className="bg-white rounded-xl shadow-md p-6 text-center">
               <p className="text-gray-500 mb-4">Choose a track to see what's coming up across your subjects.</p>
               <button
                 onClick={() => navigate("/tracks")}
-                className="px-5 py-2.5 rounded-lg bg-[#003366] text-white font-medium hover:bg-[#002347] transition-colors"
+                className="px-5 py-2.5 rounded-lg bg-[#103254] text-white font-medium hover:bg-[#0B1F33] transition-colors"
               >
                 Choose Tracks
               </button>
@@ -545,7 +545,7 @@ const OverviewPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <FeedColumn
                 title="New Assessments"
-                icon={<CheckCircle className="h-5 w-5 text-[#336699]" />}
+                icon={<CheckCircle className="h-5 w-5 text-[#2666A6]" />}
                 items={crossTrackFeed.newAssessments}
                 emptyLabel="No new assessments right now."
                 renderMeta={(item) => `${item.number_of_questions || item.totalQuestions || "?"} questions`}
@@ -554,7 +554,7 @@ const OverviewPage = () => {
               />
               <FeedColumn
                 title="Upcoming Competitions"
-                icon={<ShoppingBag className="h-5 w-5 text-[#336699]" />}
+                icon={<ShoppingBag className="h-5 w-5 text-[#2666A6]" />}
                 items={crossTrackFeed.upcomingCompetitions}
                 emptyLabel="No upcoming competitions right now."
                 renderMeta={(item) => item.start_date}
@@ -563,7 +563,7 @@ const OverviewPage = () => {
               />
               <FeedColumn
                 title="Upcoming Camps"
-                icon={<Calendar className="h-5 w-5 text-[#336699]" />}
+                icon={<Calendar className="h-5 w-5 text-[#2666A6]" />}
                 items={crossTrackFeed.upcomingCamps}
                 emptyLabel="No upcoming camps right now."
                 renderMeta={(item) => item.is_virtual ? "Virtual" : (item.location || item.start_date)}
@@ -584,16 +584,16 @@ const OverviewPage = () => {
           >
             <div className="bg-white rounded-xl shadow-md overflow-hidden">
               <div className="p-6">
-                <h2 className="text-2xl font-semibold text-[#003366] mb-6">Your Progress Summary</h2>
+                <h2 className="text-2xl font-semibold text-[#103254] mb-6">Your Progress Summary</h2>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Total Programs */}
                   <div className="bg-[#F0F4F8] rounded-lg p-4 flex items-center">
-                    <div className="bg-[#003366] p-3 rounded-lg mr-4">
+                    <div className="bg-[#103254] p-3 rounded-lg mr-4">
                       <ShoppingBag className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <p className="text-gray-500 text-sm">Total Programs</p>
-                      <p className="text-2xl font-bold text-[#003366]">
+                      <p className="text-2xl font-bold text-[#103254]">
                         {registeredPrograms || 0}
                       </p>
                     </div>
@@ -601,12 +601,12 @@ const OverviewPage = () => {
                   
                   {/* Completed Assessments */}
                   <div className="bg-[#F0F4F8] rounded-lg p-4 flex items-center">
-                    <div className="bg-[#336699] p-3 rounded-lg mr-4">
+                    <div className="bg-[#2666A6] p-3 rounded-lg mr-4">
                       <CheckCircle className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <p className="text-gray-500 text-sm">Completed Quizzes</p>
-                      <p className="text-2xl font-bold text-[#336699]">
+                      <p className="text-2xl font-bold text-[#2666A6]">
                         {assessments.filter(a => a.completed).length}
                       </p>
                     </div>
@@ -614,12 +614,12 @@ const OverviewPage = () => {
                   
                   {/* Learning Resources */}
                   <div className="bg-[#F0F4F8] rounded-lg p-4 flex items-center">
-                    <div className="bg-[#6699CC] p-3 rounded-lg mr-4">
+                    <div className="bg-[#6199D1] p-3 rounded-lg mr-4">
                       <BookOpen className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <p className="text-gray-500 text-sm">Learning Resources</p>
-                      <p className="text-2xl font-bold text-[#6699CC]">
+                      <p className="text-2xl font-bold text-[#6199D1]">
                         {learningResources.length}
                       </p>
                     </div>
@@ -662,14 +662,14 @@ const OverviewPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Average score per track */}
             <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
-              <h3 className="text-xl font-semibold text-[#003366] mb-4">Subject Performance</h3>
+              <h3 className="text-xl font-semibold text-[#103254] mb-4">Subject Performance</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={trackStats.map(s => ({ subject: s.name, score: s.avgScore ?? 0 }))} margin={{ top: 5, right: 5, bottom: 20, left: 0 }}>
                     <XAxis dataKey="subject" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="score" fill="#336699" />
+                    <Bar dataKey="score" fill="#2666A6" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -677,7 +677,7 @@ const OverviewPage = () => {
 
             {/* Resource distribution across tracks */}
             <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
-              <h3 className="text-xl font-semibold text-[#003366] mb-4">Learning Focus</h3>
+              <h3 className="text-xl font-semibold text-[#103254] mb-4">Learning Focus</h3>
               {trackStats.every(s => s.courses === 0) ? (
                 <div className="h-64 flex items-center justify-center text-gray-400 text-sm">No resources tagged into your tracks yet.</div>
               ) : (

@@ -2,8 +2,8 @@ import { useState } from "react"
 import { KeyRound, Lock, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react"
 import { examLogin } from "../lib/examApi"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 export default function ExamEntry({ sessionCode, onAuthenticated }) {
   const [accessCode, setAccessCode] = useState("")
@@ -34,7 +34,7 @@ export default function ExamEntry({ sessionCode, onAuthenticated }) {
 
         <div className="text-center mb-7">
           <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold mb-3"
-            style={{ backgroundColor: "#6699CC30", color: NAVY }}>
+            style={{ backgroundColor: "#6199D130", color: NAVY }}>
             <ShieldCheck size={13} /> Supervised exam
           </div>
           <h1 className="text-3xl font-bold mb-2" style={{ color: NAVY }}>Sign in to your exam</h1>
@@ -59,7 +59,7 @@ export default function ExamEntry({ sessionCode, onAuthenticated }) {
                 spellCheck={false}
                 required
                 className="w-full pl-10 pr-4 py-3 rounded-xl border font-mono tracking-widest uppercase text-base focus:outline-none focus:ring-2 transition-all"
-                style={{ borderColor: error ? "#ef4444" : "#33669930" }}
+                style={{ borderColor: error ? "#ef4444" : "#2666A630" }}
               />
             </div>
           </div>
@@ -78,7 +78,7 @@ export default function ExamEntry({ sessionCode, onAuthenticated }) {
                 autoComplete="off"
                 required
                 className="w-full pl-10 pr-4 py-3 rounded-xl border text-base focus:outline-none focus:ring-2 transition-all"
-                style={{ borderColor: error ? "#ef4444" : "#33669930" }}
+                style={{ borderColor: error ? "#ef4444" : "#2666A630" }}
               />
             </div>
           </div>

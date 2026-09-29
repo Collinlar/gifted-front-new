@@ -30,9 +30,9 @@ import QuestionImage from "../Components/common/QuestionImage"
 
 // Brand colors
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699", 
-  accent: "#6699CC",
+  primary: "#103254",
+  secondary: "#2666A6", 
+  accent: "#6199D1",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",
@@ -429,7 +429,7 @@ export default function ContestPage() {
     return {
       title: "📚 LEARNING EXPLORER",
       description: "Good effort! Keep practicing to improve!",
-      color: "#3B82F6", // Blue
+      color: "#2A6EB2", // Blue
       bgColor: "from-blue-400 to-indigo-500",
       hasAnimation: false,
       level: "learning"

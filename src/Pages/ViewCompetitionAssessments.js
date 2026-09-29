@@ -40,7 +40,7 @@ export default ViewCompetitionAssessments
 // Quiz Card Component
 function QuizCard({ quiz, startQuiz }) {
   const brandColors = {
-    accent: "#2563eb",
+    accent: "#1D5790",
     primary: "#1e293b",
     secondary: "#64748b",
     text: "#475569",
@@ -53,7 +53,7 @@ function QuizCard({ quiz, startQuiz }) {
         hidden: { opacity: 0, y: 20 },
         show: { opacity: 1, y: 0 },
       }}
-      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(0, 51, 102, 0.15)" }}
+      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(16, 50, 84, 0.15)" }}
       className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 flex flex-col h-full"
       style={{ border: `1px solid ${brandColors.accent}10` }}
     >

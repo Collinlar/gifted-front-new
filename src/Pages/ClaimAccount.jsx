@@ -10,7 +10,7 @@ import { supabaseAdmin } from "../lib/supabaseAdmin"
 import { syncUserTracksFromInterests } from "../lib/auth"
 
 const brandColors = {
-  primary: "#003366",
+  primary: "#103254",
   background: "#F0F4F8",
 }
 

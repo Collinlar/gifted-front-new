@@ -39,7 +39,7 @@ const UserActivityHeatmap = () => {
 						<Bar dataKey='8-12' stackId='a' fill='#EC4899' />
 						<Bar dataKey='12-16' stackId='a' fill='#10B981' />
 						<Bar dataKey='16-20' stackId='a' fill='#F59E0B' />
-						<Bar dataKey='20-24' stackId='a' fill='#3B82F6' />
+						<Bar dataKey='20-24' stackId='a' fill='#2A6EB2' />
 					</BarChart>
 				</ResponsiveContainer>
 			</div>

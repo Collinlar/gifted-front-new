@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { T, display, body, useGiftedFonts } from "./giftedTheme"
 import { getHomepage, DEFAULTS, list } from "../lib/homepageContent"
+import GiftedLogo from "../Components/common/GiftedLogo"
 
 const ROTATE_MS = 5200
 
@@ -187,6 +188,9 @@ export default function Home() {
         <div className="gf-heroInner">
           <header className="gf-header">
             <a href="/" className="gf-brand" onClick={(e) => { e.preventDefault(); scrollTo("top") }}>
+              {/* The mark, not the full lockup: the wordmark beside it stays
+                  admin editable, and the lockup carries its own. */}
+              <GiftedLogo variant="mark" tone="bone" height={34} className="gf-mark" />
               <span className="gf-wordmark">{brand.wordmark}</span>
               <span className="gf-kicker">{brand.kicker}</span>
             </a>
@@ -282,6 +286,7 @@ const CSS = `
 
 .gf-header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:clamp(64px,9vh,88px);flex:none;border-bottom:1px solid rgba(246,245,242,.14)}
 .gf-brand{display:flex;align-items:baseline;gap:12px;text-decoration:none}
+.gf-mark{align-self:center;flex:none}
 .gf-wordmark{font-family:${display};font-weight:700;font-size:26px;letter-spacing:-.02em;color:${T.bone}}
 .gf-kicker{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(246,245,242,.45)}
 .gf-nav{display:flex;align-items:center;gap:clamp(16px,2.4vw,32px)}

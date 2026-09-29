@@ -71,7 +71,7 @@ export function Empty({ icon: Icon, title, line, action }) {
 
 export function Notice({ tone = "info", children }) {
   const tones = {
-    info:    { bg: "#EFF6FF", border: "#BFDBFE", text: "#1D4ED8" },
+    info:    { bg: "#EFF6FF", border: "#BFDBFE", text: "#15426F" },
     good:    { bg: A.greenSoft, border: "#A7F3D0", text: A.green },
     warn:    { bg: A.amberSoft, border: "#FDE68A", text: A.amber },
     bad:     { bg: A.redSoft,   border: "#FECACA", text: A.red },

@@ -497,7 +497,7 @@ const QuizPage = () => {
                   ) : (
                     <div className="mb-7 py-8">
                       <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-blue-50">
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth="2.2"
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#15426F" strokeWidth="2.2"
                           strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                       </div>
                       <p className="text-xl font-semibold text-blue-900 mb-1.5">Your answers are in</p>

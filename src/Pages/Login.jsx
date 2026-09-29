@@ -11,9 +11,9 @@ import { supabase } from "../lib/supabase"
 
 // Brand colors
 const brandColors = {
-  primary: "#003366", // Dark blue
-  secondary: "#336699", // Medium blue
-  accent: "#6699CC", // Light blue
+  primary: "#103254", // Dark blue
+  secondary: "#2666A6", // Medium blue
+  accent: "#6199D1", // Light blue
   background: "#F0F4F8", // Light background
   text: "#333333", // Dark text
   white: "#FFFFFF", // White
@@ -409,17 +409,17 @@ const Login = () => {
               className="mb-6 p-4 rounded-lg border"
               style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }}
             >
-              <p className="text-sm font-semibold mb-1" style={{ color: "#1E40AF" }}>
+              <p className="text-sm font-semibold mb-1" style={{ color: "#15426F" }}>
                 Your account needs a new password
               </p>
-              <p className="text-sm mb-3" style={{ color: "#1D4ED8" }}>
+              <p className="text-sm mb-3" style={{ color: "#15426F" }}>
                 We moved to a new system. Your scores, courses, and history are safe. Use the phone number you registered with to claim your account.
               </p>
               <button
                 type="button"
                 onClick={() => navigate("/claim-account")}
                 className="w-full py-2 px-4 rounded-lg text-sm font-medium text-white transition-all"
-                style={{ backgroundColor: "#1D4ED8" }}
+                style={{ backgroundColor: "#15426F" }}
               >
                 Claim my account
               </button>

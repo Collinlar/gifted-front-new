@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom"
 import { ClipboardList, ArrowRight, Clock, CreditCard, AlertCircle } from "lucide-react"
 import { getOpenFormsForMe, getMyRegistrations } from "../lib/registrationApi"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 // Dashboard strip of programmes currently taking registrations.
 //

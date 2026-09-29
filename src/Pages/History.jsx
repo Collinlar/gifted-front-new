@@ -9,8 +9,8 @@ import { getUserHistory } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
 
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
+  primary: "#103254",
+  secondary: "#2666A6",
   teal: "#1D9E75",
   gold: "#E8A020",
   background: "#F0F4F8",
@@ -30,7 +30,7 @@ const StatusBadge = ({ status }) => {
     registered: { bg: "#E1F5EE", color: "#085041", label: "Registered" },
     paid:        { bg: "#E1F5EE", color: "#085041", label: "Paid" },
     pending:     { bg: "#FEF3E2", color: "#633806", label: "Pending" },
-    confirmed:   { bg: "#E6F1FB", color: "#185FA5", label: "Confirmed" },
+    confirmed:   { bg: "#E6F1FB", color: "#215E9C", label: "Confirmed" },
     cancelled:   { bg: "#FEE2E2", color: "#991B1B", label: "Cancelled" },
   }
   const s = map[status?.toLowerCase()] || map.registered

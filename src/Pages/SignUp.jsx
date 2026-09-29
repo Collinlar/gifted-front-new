@@ -23,9 +23,9 @@ import { Country } from "country-state-city";
 
 // Brand colors
 const brandColors = {
-  primary: "#003366", // Dark blue
-  secondary: "#336699", // Medium blue
-  accent: "#6699CC", // Light blue
+  primary: "#103254", // Dark blue
+  secondary: "#2666A6", // Medium blue
+  accent: "#6199D1", // Light blue
   background: "#F0F4F8", // Light background
   text: "#333333", // Dark text
   white: "#FFFFFF", // White

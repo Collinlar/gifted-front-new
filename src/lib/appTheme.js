@@ -1,19 +1,22 @@
 // Tokens for the signed-in app.
 //
-// Separate from giftedTheme.js, which is the marketing and auth language.
-// This one is the working surface: navy on a cool grey ground, quiet, legible
-// on a phone in daylight.
+// The navy is no longer this file's to decide. It comes from lib/navy.js, the
+// same ramp the homepage is built on, so a student does not meet one blue
+// signed out and a different one signed in.
 //
-// It exists because every page had been re-declaring its own brandColors
-// object with slightly different values, and the marketplace had drifted to a
-// sky-blue gradient that belonged to no part of the product.
+// What stays here is the working surface: navy on a cool grey ground, quiet,
+// legible on a phone in daylight, plus the status colours and the date helpers.
+
+import { NAVY } from "./navy"
+
+export { NAVY }
 
 export const A = {
-  navy:       "#003366", // headings, primary actions
-  navyDeep:   "#002347",
-  mid:        "#336699", // secondary text, links
-  accent:     "#6699CC",
-  ground:     "#F0F4F8", // page background
+  navy:       NAVY[800], // headings, primary actions
+  navyDeep:   NAVY[900],
+  mid:        "#2666A6", // secondary text, links
+  accent:     "#6199D1",
+  ground:     NAVY[50],  // page background
   surface:    "#FFFFFF",
   line:       "#E5E7EB",
   lineSoft:   "#F1F4F7",

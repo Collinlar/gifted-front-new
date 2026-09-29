@@ -8,7 +8,7 @@ import { getTokenUserId } from "../lib/auth"
 
 const TYPE_META = {
   general:  { label: "Update",     color: "#4B5563", bg: "#F3F4F6", Icon: Megaphone    },
-  exam:     { label: "Assessment", color: "#185FA5", bg: "#E6F1FB", Icon: FileQuestion },
+  exam:     { label: "Assessment", color: "#215E9C", bg: "#E6F1FB", Icon: FileQuestion },
   contest:  { label: "Contest",    color: "#E8A020", bg: "#FEF3E2", Icon: Zap          },
   results:  { label: "Results",    color: "#1D9E75", bg: "#E1F5EE", Icon: CheckCircle  },
   course:   { label: "Course",     color: "#7C3AED", bg: "#F3F0FF", Icon: BookOpen     },

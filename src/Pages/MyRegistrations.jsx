@@ -8,8 +8,8 @@ import { usePaystackPayment } from "react-paystack"
 import { getMyRegistrations, getOpenFormsForMe, markPaid } from "../lib/registrationApi"
 import PaymentInstructions from "../Components/common/PaymentInstructions"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 // Each status says what it means for the student and what, if anything, they
 // need to do. A bare label like "submitted" leaves them guessing.
@@ -19,7 +19,7 @@ const STATUS = {
     line: "You started this but have not sent it yet.", Icon: Hourglass,
   },
   submitted: {
-    label: "Received", tone: "#1D4ED8", bg: "#EFF6FF",
+    label: "Received", tone: "#15426F", bg: "#EFF6FF",
     line: "We have your registration and will review it.", Icon: CheckCircle2,
   },
   under_review: {

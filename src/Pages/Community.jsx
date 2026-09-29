@@ -20,9 +20,9 @@ import { useNavigate } from "react-router-dom"
 
 // Brand colors
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
-  accent: "#6699CC",
+  primary: "#103254",
+  secondary: "#2666A6",
+  accent: "#6199D1",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",
@@ -388,7 +388,7 @@ function CommunityCard({ community }) {
         hidden: { opacity: 0, y: 20 },
         show: { opacity: 1, y: 0 },
       }}
-      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(0, 51, 102, 0.15)" }}
+      whileHover={{ y: -8, boxShadow: "0 15px 30px -10px rgba(16, 50, 84, 0.15)" }}
       className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 flex flex-col h-full"
       style={{ border: `1px solid ${brandColors.accent}10` }}
     >

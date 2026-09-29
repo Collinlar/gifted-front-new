@@ -13,8 +13,8 @@ import {
   rememberGuestRegistration, getGuestRegistration, confirmGuestPayment, lookupAccount,
 } from "../lib/registrationApi"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 // Half-finished answers, held for this tab only.
 //
@@ -342,7 +342,7 @@ export default function RegisterProgram() {
               <div className="mt-5 rounded-xl border px-4 py-3.5"
                 style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm" style={{ color: "#1E3A8A" }}>
+                  <p className="text-sm" style={{ color: "#103254" }}>
                     {recognised.claimable
                       ? "We already have a record of you from before. Claim your account and this form, and every one after it, fills itself in."
                       : "That already belongs to an account here. Sign in and we will fill the rest in for you."}
@@ -375,7 +375,7 @@ export default function RegisterProgram() {
                     </button>
                   )}
                 </div>
-                <p className="text-xs mt-2.5" style={{ color: "#1E40AF" }}>
+                <p className="text-xs mt-2.5" style={{ color: "#15426F" }}>
                   Either way you come straight back here and nothing you have typed is lost.
                 </p>
               </div>

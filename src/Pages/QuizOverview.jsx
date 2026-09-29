@@ -8,8 +8,8 @@ import {
   AlertTriangle, Play, Info,
 } from "lucide-react";
 
-const NAVY = "#003366";
-const MID  = "#336699";
+const NAVY = "#103254";
+const MID  = "#2666A6";
 
 // Shown only when the assessment carries no instructions of its own. Previously
 // this list rendered on every quiz regardless, alongside whatever the admin had

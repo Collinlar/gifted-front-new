@@ -1,6 +1,7 @@
 import { CgProfile } from "react-icons/cg";
 import { Link, useNavigate } from "react-router-dom";
 import { RiLogoutBoxLine } from "react-icons/ri";
+import { A } from "../../lib/appTheme";
 
 const Header = ({ title }) => {
 	const navigate = useNavigate()
@@ -26,10 +27,12 @@ const Header = ({ title }) => {
 
 
 	}
+	// The bar was a half opacity black over a light page, which came out grey
+	// and matched neither the sidebar nor the homepage. It is the navy now.
 	return (
-		<header className='bg-black bg-opacity-50 backdrop-blur-md shadow-lg border-b border-black'>
+		<header className='backdrop-blur-md shadow-lg border-b' style={{ backgroundColor: A.navy, borderColor: A.navyDeep }}>
 			<div className='max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 justify-between flex'>
-				<h1 className='text-2xl font-semibold text-gray-100'>{title}</h1>
+				<h1 className='text-2xl font-semibold text-white'>{title}</h1>
 				<div className="flex">
 
 				<Link to="/user-details"><CgProfile className="text-white w-[50px] hover:cursor-pointer"/> </Link>

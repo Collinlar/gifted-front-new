@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { loginUser, registerUser } from "../lib/auth"
 import { T, display, body, useGiftedFonts } from "./giftedTheme"
+import GiftedLogo from "../Components/common/GiftedLogo"
 
 // ── Role definitions ───────────────────────────────────────────────────────
 //
@@ -177,6 +178,7 @@ export default function Auth() {
         <div className="ga-artScrim" aria-hidden />
         <div className="ga-artInner">
           <button className="ga-brand" onClick={() => navigate("/")}>
+            <GiftedLogo variant="mark" tone="bone" height={34} className="ga-mark" />
             <span className="ga-wordmark">Gifted</span>
             <span className="ga-kicker">Olympiad Edu Center</span>
           </button>
@@ -370,6 +372,7 @@ const CSS = `
 .ga-artImg{position:absolute;inset:0;background-image:url(/math.jpg);background-size:cover;background-position:center}
 .ga-artScrim{position:absolute;inset:0;background:linear-gradient(120deg,rgba(8,24,42,.92) 0%,rgba(8,24,42,.66) 55%,rgba(8,24,42,.34) 100%)}
 .ga-artInner{position:relative;height:100%;display:flex;flex-direction:column;justify-content:space-between;gap:24px;padding:clamp(24px,3vw,48px)}
+.ga-mark{align-self:center;flex:none}
 .ga-brand{display:flex;align-items:baseline;gap:12px;background:none;border:0;padding:0;cursor:pointer;text-align:left}
 .ga-wordmark{font-family:${display};font-weight:700;font-size:26px;letter-spacing:-.02em;color:${T.bone}}
 .ga-kicker{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(246,245,242,.45)}

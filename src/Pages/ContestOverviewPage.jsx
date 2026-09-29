@@ -24,9 +24,9 @@ import { getTokenUserId } from '../lib/auth';
 
 // Brand colors matching your existing design
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
-  accent: "#6699CC",
+  primary: "#103254",
+  secondary: "#2666A6",
+  accent: "#6199D1",
   background: "#F0F4F8",
   text: "#333333",
   white: "#FFFFFF",

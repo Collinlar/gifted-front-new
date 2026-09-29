@@ -14,9 +14,9 @@ import { getUserDetails, updateUserDetails, updateProfilePicture, updateCoverIma
 import { resetPassword, getTokenUserId } from "../lib/auth"
 
 const brandColors = {
-  primary: "#003366",
-  secondary: "#336699",
-  accent: "#6699CC",
+  primary: "#103254",
+  secondary: "#2666A6",
+  accent: "#6199D1",
   background: "#F0F4F8",
   border: "#E5E7EB",
   success: "#1D9E75",

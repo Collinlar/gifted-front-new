@@ -3,8 +3,8 @@ import { useParams } from "react-router-dom"
 import { ShieldCheck, ShieldX, Loader2, Search } from "lucide-react"
 import { supabase } from "../lib/supabase"
 
-const NAVY = "#003366"
-const MID  = "#336699"
+const NAVY = "#103254"
+const MID  = "#2666A6"
 
 // Public page. Anyone with a serial can check a certificate, which is the whole
 // point of printing one on the document.
@@ -56,7 +56,7 @@ export default function VerifyCertificate() {
               onChange={(e) => setSerial(e.target.value.toUpperCase())}
               placeholder="GHSTEM-2026-0042"
               className="w-full pl-10 pr-4 py-3 rounded-xl border font-mono uppercase tracking-wider text-base focus:outline-none focus:ring-2"
-              style={{ borderColor: "#33669930" }}
+              style={{ borderColor: "#2666A630" }}
             />
           </div>
 
