@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Timer,
@@ -10,91 +10,77 @@ import { getTokenUserId, getStoredProfile } from '../lib/auth'
 
 function TimedChallenge() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state || {};
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0); // Will be set when questions load
+  const [timeLeft, setTimeLeft] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  const [questions,setQuestions]= useState([])
+  const [questions, setQuestions] = useState([]);
+  const [challengeTitle, setChallengeTitle] = useState('');
+  // Seconds allowed on each question, set by whoever authored the challenge
+  const [perQuestion, setPerQuestion] = useState(30);
+  const [loadState, setLoadState] = useState('loading'); // loading | ready | none | failed
 
 
-  // Mock quiz data
-  const questionss = [
-    {
-      id: 1,
-      question: "What is the capital of France?",
-      options: ["London", "Paris", "Berlin", "Madrid"],
-      correct: 1
-    },
-    {
-      id: 2,
-      question: "What is 2 + 2?",
-      options: ["3", "4", "5", "6"],
-      correct: 1
-    },
-    {
-      id: 3,
-      question: "Who wrote 'Romeo and Juliet'?",
-      options: ["Charles Dickens", "William Shakespeare", "Mark Twain", "Jane Austen"],
-      correct: 1
-    },
-    {
-      id: 4,
-      question: "What is the largest planet?",
-      options: ["Earth", "Mars", "Jupiter", "Saturn"],
-      correct: 2
-    },
-    {
-      id: 5,
-      question: "What is the chemical symbol for gold?",
-      options: ["Go", "Au", "Ag", "Gd"],
-      correct: 1
-    }
-  ];
-
-    useEffect(()=>{
-      const fetchFlashCard = async()=>{
-        try{
-          const response = await getTimedChallenge(localStorage.getItem("courseId"))
-          const fetchedQuestions = response.challenge;
-          setQuestions(fetchedQuestions)
-          if (fetchedQuestions.length > 0) {
-            const timeInMinutes = fetchedQuestions[0].time || 5; // Default to 5 minutes if no time property
-            setTimeLeft(timeInMinutes * 60)
-          }
-        }catch(error){
-          console.log(error)
-        }
-      }
-      fetchFlashCard()
-    },[])
-
-  // Timer effect
+  // Same scope the flashcards page hands to Classic mode: whatever set the
+  // student opened. A course first, a track otherwise.
   useEffect(() => {
-    let timer;
-    if (gameStarted && !gameEnded && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft(time => {
-          if (time <= 1) {
-            setGameEnded(true);
-            return 0;
-          }
-          return time - 1;
-        });
-      }, 1000);
+    const loadChallenge = async () => {
+      try {
+        const courseId = locationState.id || locationState._id || localStorage.getItem("courseId")
+        const trackId  = locationState.trackId || localStorage.getItem("flashcardTrackId")
+        const { challenge } = await getTimedChallenge({ courseId, trackId })
+
+        if (!challenge || challenge.questions.length === 0) {
+          setLoadState('none')
+          return
+        }
+        setQuestions(challenge.questions)
+        setChallengeTitle(challenge.title)
+        setPerQuestion(challenge.secondsPerQuestion)
+        setLoadState('ready')
+      } catch (error) {
+        console.error("Could not load the timed challenge:", error)
+        setLoadState('failed')
+      }
     }
-    return () => clearInterval(timer);
-  }, [gameStarted, gameEnded, timeLeft]);
+    loadChallenge()
+  }, [])
+
+  // Moving on is the same whether the student answered or the clock beat
+  // them to it, so both go through here.
+  const advance = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setTimeLeft(perQuestion);
+    } else {
+      setGameEnded(true);
+    }
+  };
+
+  // The clock runs per question, which is what "seconds per question" means
+  // where the challenge is authored. Running out costs you that question, it
+  // does not end the challenge. It also pauses while the answer is revealed,
+  // so the second spent seeing you were right is not taken off the next one.
+  useEffect(() => {
+    if (!gameStarted || gameEnded || selectedAnswer !== null) return;
+    if (timeLeft <= 0) { advance(); return; }
+    const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [gameStarted, gameEnded, timeLeft, selectedAnswer]);
 
   const startGame = () => {
     if (questions.length === 0) return;
-    
+
     setGameStarted(true);
     setCurrentQuestion(0);
     setScore(0);
-    const timeInMinutes = questions[0].time || 5; // Default to 5 minutes if no time property
-    setTimeLeft(timeInMinutes * 60);
+    setSelectedAnswer(null);
+    setTimeLeft(perQuestion);
     setGameEnded(false);
     hasPostedRef.current = false;
     startTimeRef.current = Date.now();
@@ -102,19 +88,12 @@ function TimedChallenge() {
 
   const handleAnswer = (answerIndex) => {
     setSelectedAnswer(answerIndex);
-    
+
     if (answerIndex === questions[currentQuestion].correct) {
       setScore(score + 1);
     }
 
-    setTimeout(() => {
-      if (currentQuestion < questions.length - 1) {
-        setCurrentQuestion(currentQuestion + 1);
-        setSelectedAnswer(null);
-      } else {
-        setGameEnded(true);
-      }
-    }, 1000);
+    setTimeout(advance, 1000);
   };
 
   const formatTime = (seconds) => {
@@ -184,22 +163,59 @@ function TimedChallenge() {
             {!gameStarted ? (
               <>
                 <Timer className="text-orange-600 mx-auto mb-4" size={48} />
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready for the Challenge?</h2>
-                <p className="text-gray-600 mb-6">
-                  {`You have ${questions.length > 0 && questions[0].time ? questions[0].time : 5} minutes to answer ${questions.length} questions.`}
-                  Each correct answer earns you points!
-                </p>
-                <button
-                  onClick={startGame}
-                  disabled={questions.length === 0}
-                  className={`px-8 py-4 rounded-lg text-lg font-semibold ${
-                    questions.length === 0 
-                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
-                      : 'bg-orange-600 text-white hover:bg-orange-700'
-                  }`}
-                >
-                  {questions.length === 0 ? 'Loading Questions...' : 'Start Challenge'}
-                </button>
+
+                {loadState === 'loading' && (
+                  <>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Setting up your questions</h2>
+                    <p className="text-gray-600 mb-6">One moment.</p>
+                  </>
+                )}
+
+                {/* Previously this sat on "Loading Questions..." forever when
+                    a set had no challenge attached, which read as a hang. */}
+                {loadState === 'none' && (
+                  <>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">No timed challenge for this set yet</h2>
+                    <p className="text-gray-600 mb-6">
+                      Your tutors have not put one together for this topic. Classic cards are ready if you want to study now.
+                    </p>
+                    <button
+                      onClick={() => navigate('/flashcards/classic', { state: locationState })}
+                      className="px-8 py-4 rounded-lg text-lg font-semibold bg-orange-600 text-white hover:bg-orange-700"
+                    >
+                      Study the cards instead
+                    </button>
+                  </>
+                )}
+
+                {loadState === 'failed' && (
+                  <>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">We could not reach the challenge</h2>
+                    <p className="text-gray-600 mb-6">Check your connection and tap again.</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-8 py-4 rounded-lg text-lg font-semibold bg-orange-600 text-white hover:bg-orange-700"
+                    >
+                      Try loading it again
+                    </button>
+                  </>
+                )}
+
+                {loadState === 'ready' && (
+                  <>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">{challengeTitle}</h2>
+                    <p className="text-gray-600 mb-6">
+                      {questions.length} question{questions.length === 1 ? '' : 's'}, {perQuestion} seconds on each.
+                      Run out of time on one and it moves on without you.
+                    </p>
+                    <button
+                      onClick={startGame}
+                      className="px-8 py-4 rounded-lg text-lg font-semibold bg-orange-600 text-white hover:bg-orange-700"
+                    >
+                      Start the challenge
+                    </button>
+                  </>
+                )}
               </>
             ) : (
               <>

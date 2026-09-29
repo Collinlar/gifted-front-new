@@ -756,14 +756,67 @@ export async function getTrackFlashcards(trackId) {
   return { success: true, flashcards: data || [] }
 }
 
-export async function getTimedChallenge(courseId) {
-  const { data, error } = await supabaseAdmin
-    .from('timed_challenges')
-    .select('*, timed_challenge_sets(*)')
-    .eq('course_id', courseId)
+/**
+ * The timed challenge for a course or a track.
+ *
+ * This used to read the legacy timed_challenges table and ask PostgREST to
+ * embed timed_challenge_sets alongside it. There is no foreign key between
+ * those two, so the request returned 400 every time and the page never
+ * loaded a question. They were never parent and child: they are two models
+ * of the same idea, and the sets table is the one admin authors into.
+ *
+ * Admin stores a question as { question, answers[], correctAnswer }. The page
+ * wants { question, options[], correct } where correct is an index, so the
+ * mapping happens here rather than in the component.
+ *
+ * Scoping mirrors flashcards: a course id first, a track id otherwise, which
+ * is how the student arrives from the flashcards page either way.
+ */
+/**
+ * Turns one authored row into what the timed challenge page renders.
+ * Exported so the mapping can be checked on its own, without a round trip.
+ */
+export function mapTimedChallenge(row) {
+  if (!row) return null
 
+  const questions = (Array.isArray(row.questions) ? row.questions : [])
+    .map((item) => {
+      const options = (item.answers || []).filter((a) => String(a || '').trim())
+      return {
+        question: item.question || '',
+        options,
+        correct: options.indexOf(item.correctAnswer),
+      }
+    })
+    // A question saved with no right answer ticked would mark every attempt
+    // wrong and never say why, so it is dropped rather than shown.
+    .filter((item) => item.question && item.options.length > 1 && item.correct >= 0)
+
+  return {
+    id: row.id,
+    title: row.title || 'Timed challenge',
+    // The admin field is labelled "Seconds per question" and means it.
+    secondsPerQuestion: Number(row.duration) > 0 ? Number(row.duration) : 30,
+    questions,
+  }
+}
+
+export async function getTimedChallenge({ courseId, trackId } = {}) {
+  if (!courseId && !trackId) return { success: true, challenge: null }
+
+  let q = supabaseAdmin
+    .from('timed_challenge_sets')
+    .select('*')
+    .eq('publish', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  q = courseId ? q.eq('course_id', courseId) : q.eq('track_id', trackId)
+
+  const { data, error } = await q
   if (error) throw error
-  return { success: true, challenge: data }
+
+  return { success: true, challenge: mapTimedChallenge(data?.[0]) }
 }
 
 // ─── Community / Channels ──────────────────────────────────────────────────────
