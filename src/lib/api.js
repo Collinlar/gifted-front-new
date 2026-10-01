@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { supabaseAdmin } from './supabaseAdmin'
 import { shrinkImage } from './imageResize'
+import { parseGrade, matchesGrade } from './grades'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,9 @@ export async function updateUserDetails(userId, updates) {
   if ('educationalLevel'       in updates) dbUpdates.educational_level       = updates.educationalLevel
   if ('School'                 in updates) dbUpdates.school                  = updates.School
   if ('userName'               in updates) dbUpdates.user_name               = updates.userName
+  // grade is an integer 1 to 12. Coerced here so a caller passing a label
+  // or an empty string cannot put the column back into the state it was in.
+  if ('grade'                  in updates) dbUpdates.grade                   = parseGrade(updates.grade)
 
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -1230,7 +1234,10 @@ export async function getAnnouncementsForUser(userId) {
   if (!userId) return { announcements: [] }
   try {
     const userRes = await supabaseAdmin.from('users').select('grade').eq('id', userId).single()
-    const userGrade = String(userRes.data?.grade || '')
+    // This compared the raw stored string against target_grades, which hold
+    // bare numbers. Only a user stored as "7".."12" ever matched, so 5,476 of
+    // 6,228 students could not be reached by a targeted announcement at all.
+    const userGrade = parseGrade(userRes.data?.grade)
 
     const [tracksRes, dismissedRes] = await Promise.all([
       supabaseAdmin.from('user_tracks').select('track_id').eq('user_id', userId),
@@ -1251,8 +1258,7 @@ export async function getAnnouncementsForUser(userId) {
 
     const filtered = (all || []).filter(a => {
       if (dismissedIds.has(a.id)) return false
-      const grades = a.target_grades || []
-      if (grades.length > 0 && !grades.includes(userGrade)) return false
+      if (!matchesGrade(userGrade, a.target_grades)) return false
       const tracks = a.target_tracks || []
       if (tracks.length > 0 && !tracks.some(t => trackIds.includes(t))) return false
       return true

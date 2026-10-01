@@ -13,6 +13,7 @@ import axios from "axios";
 import { getQuizDetails, getAllLearningResourceAnalytics, getUserDetails, getUserTracks, getTrackContent } from "../lib/api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import AnnouncementsSection from "./AnnouncementsSection";
+import GradePrompt from "../Components/common/GradePrompt";
 import OpenRegistrations from "./OpenRegistrations";
 
 // Brand colors
@@ -450,6 +451,10 @@ const OverviewPage = () => {
             Track your programs, access learning resources, and take assessments all in one place.
           </p>
         </motion.div>
+
+        {/* Asks for a grade when we could not work one out. Renders nothing
+            for everyone else, and never blocks the page. */}
+        <GradePrompt />
 
         {/* Announcements */}
         <AnnouncementsSection />

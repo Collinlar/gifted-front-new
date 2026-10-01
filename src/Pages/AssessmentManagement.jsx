@@ -18,6 +18,7 @@ import AI from "../Components/images/AI.jpg"
 import CyberSecurity from "../Components/images/3849223.jpg"
 import Renewable from "../Components/images/7314.jpg"
 import { getAllExams } from "../lib/api"
+import { parseGrade, matchesGrade } from "../lib/grades"
 
 // Brand colors
 const brandColors = {
@@ -144,12 +145,6 @@ export default function AssessmentManagement() {
   }, [])
 
   // Normalize any grade representation (e.g., "Grade 7", "grade 7", 7, "7") to a number
-  const toGradeNumber = (value) => {
-    if (value === null || value === undefined) return null
-    const match = String(value).match(/\d+/)
-    return match ? Number(match[0]) : null
-  }
-
   const startQuiz = (quiz) => {
     navigate("/quiz-overview", { state: { questions: quiz } })
     console.log(quiz)
@@ -168,30 +163,13 @@ export default function AssessmentManagement() {
   const filterQuizzes = () => {
     let filtered = quizQuestions
 
-    // Only include quizzes where the user's grade exists in item.grade (array or single) after normalization
-    try {
-      const profile = JSON.parse(localStorage.getItem('user') || '{}')
-      const userGrade = profile.grade || profile.Grade || ''
-      const userGradeNumber = toGradeNumber(userGrade)
-
-      if (userGradeNumber !== null) {
-          filtered = filtered?.filter((quiz) => {
-            const quizGrades = Array.isArray(quiz.grade) ? quiz.grade : [quiz.grade]
-
-            // Check if user's grade number exists in quiz.grade array (after normalization)
-            const hasMatchingGrade = quizGrades.some((grade) => {
-              const quizGradeNumber = toGradeNumber(grade)
-              console.log("Comparing user grade number:", userGradeNumber, "with quiz grade:", grade, "-> parsed:", quizGradeNumber)
-              return quizGradeNumber !== null && quizGradeNumber === userGradeNumber
-            })
-            
-            console.log("Quiz:", quiz.title, "Grade match:", hasMatchingGrade)
-            return hasMatchingGrade
-          })
-        }
-    } catch (error) {
-      console.error("Error filtering by grade:", error)
-    }
+    // Was a local "first number in the string" parser, which read SHS 3 as
+    // Grade 3, and which hid every untagged quiz from anyone with a grade.
+    // matchesGrade treats untagged as open to all and an unknown grade as
+    // open to everything.
+    const profile = JSON.parse(localStorage.getItem('user') || '{}')
+    const userGrade = parseGrade(profile.grade ?? profile.Grade)
+    filtered = (filtered || []).filter((quiz) => matchesGrade(userGrade, quiz.grade))
 
     // Apply simple text search on title/description
     if (searchQuery) {
@@ -229,32 +207,13 @@ export default function AssessmentManagement() {
     
     console.log("After contest filter, count:", filtered.length)
 
-    // Temporarily skip grade filtering to test contest filtering
-    console.log("Skipping grade filtering for now to test contest filtering")
-    
-    // try {
-    //   const token = localStorage.getItem("token")
-    //   if (token) {
-    //     const decoded = jwtDecode(token)
-    //     const userGrade = decoded?.grade
-    //     const userGradeNumber = toGradeNumber(userGrade)
-    //     console.log("User grade:", userGrade, "parsed:", userGradeNumber)
-        
-    //     if (userGradeNumber !== null) {
-    //       filtered = filtered.filter((contest) => {
-    //         const contestGrades = Array.isArray(contest.grade) ? contest.grade : [contest.grade]
-    //         const hasMatchingGrade = contestGrades.some((grade) => {
-    //           const contestGradeNumber = toGradeNumber(grade)
-    //           return contestGradeNumber !== null && contestGradeNumber === userGradeNumber
-    //         })
-    //         console.log("Contest:", contest.title, "grade match:", hasMatchingGrade)
-    //         return hasMatchingGrade
-    //       })
-    //     }
-    //   }
-    // } catch (error) {
-    //   console.error("Error filtering contests by grade:", error)
-    // }
+    // Grade filtering was commented out with a note about testing contest
+    // filtering, and stayed off. Restored here. The commented version read
+    // the grade off the JWT, which does not carry one, so it would have
+    // hidden everything had it been switched back on as it was.
+    const contestProfile = JSON.parse(localStorage.getItem('user') || '{}')
+    const contestUserGrade = parseGrade(contestProfile.grade ?? contestProfile.Grade)
+    filtered = filtered.filter((contest) => matchesGrade(contestUserGrade, contest.grade))
 
     // Apply text search
     if (searchQuery) {

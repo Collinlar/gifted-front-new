@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { getUserDetails, updateUserDetails, updateProfilePicture, updateCoverImage } from "../lib/api"
 import { resetPassword, getTokenUserId, getStoredProfile } from "../lib/auth"
+import { gradeLabel } from "../lib/grades"
 
 const brandColors = {
   primary: "#103254",
@@ -463,7 +464,7 @@ const Profile = () => {
               <div className="space-y-3">
                 <DetailRow label="Level"  value={userDetails.educationalLevel} fieldName="educationalLevel" onEdit={openEditModal} />
                 <DetailRow label="School" value={userDetails.School}           fieldName="School"           onEdit={openEditModal} />
-                <DetailRow label="Grade"  value={userDetails.grade}            fieldName="grade"            onEdit={openEditModal} />
+                <DetailRow label="Grade"  value={gradeLabel(userDetails.grade)} fieldName="grade"            onEdit={openEditModal} />
               </div>
             </div>
 

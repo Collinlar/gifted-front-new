@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { loginUser, registerUser } from "../lib/auth"
 import { T, display, body, useGiftedFonts } from "./giftedTheme"
 import GiftedLogo from "../Components/common/GiftedLogo"
+import { GRADE_OPTIONS } from "../lib/grades"
 
 // ── Role definitions ───────────────────────────────────────────────────────
 //
@@ -29,19 +30,24 @@ const COMMON = [
 // has, so syncUserTracksFromInterests can match them and the student lands in
 // a real track rather than none.
 const INTERESTS = ["Mathematics", "Science", "ICT", "Technology", "English", "Undecided"]
-const GRADES = ["JHS 1", "JHS 2", "JHS 3", "SHS 1", "SHS 2", "SHS 3"]
+
+// Grades 1 to 12, labelled with the Ghanaian stage. This used to offer only
+// JHS 1 to SHS 3, which locked primary students out of signing up at all even
+// though 64 exams and 16 courses are tagged to grades 1 to 6, and stored a
+// value that matched no content, so whoever picked it saw an empty track.
+const GRADES = GRADE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))
 
 const EXTRA = {
   Student: [
     { name: "dob",    label: "Date of birth", type: "date", half: true },
     { name: "gender", label: "Gender", options: ["Prefer not to say", "Female", "Male"], half: true },
     { name: "school", label: "School", placeholder: "Achimota School" },
-    { name: "grade",  label: "Grade", options: GRADES, half: true },
+    { name: "grade",  label: "Grade", options: GRADES, prompt: "Which grade are you in?", half: true },
     { name: "interest", label: "Interest", options: INTERESTS, half: true },
   ],
   Parent: [
     { name: "childName",  label: "Child's name",  placeholder: "Kofi Mensah", half: true },
-    { name: "grade",      label: "Child's grade", options: GRADES, half: true },
+    { name: "grade",      label: "Child's grade", options: GRADES, prompt: "Which grade are they in?", half: true },
     { name: "school",     label: "Child's school", placeholder: "Achimota School" },
   ],
   Graduate: [
@@ -77,7 +83,7 @@ export default function Auth() {
   const [role, setRole]   = useState("Student")
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState("")
-  const [form, setForm]   = useState({ country: "Ghana", gender: "Prefer not to say", interest: "Undecided", grade: "JHS 1" })
+  const [form, setForm]   = useState({ country: "Ghana", gender: "Prefer not to say", interest: "Undecided" })
 
   const [signin, setSignin] = useState({ emailOrUsername: "", password: "" })
 
@@ -296,7 +302,19 @@ export default function Auth() {
                         <span>{f.label}{f.required ? "" : " (optional)"}</span>
                         {f.options ? (
                           <select value={form[f.name] || ""} onChange={(e) => set(f.name, e.target.value)}>
-                            {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                            {/* Without this the box would read "Grade 1" while
+                                nothing had been chosen, and a student who
+                                skipped the field would look enrolled in a
+                                grade they never picked. */}
+                            {!form[f.name] && <option value="">{f.prompt || "Choose one"}</option>}
+                            {/* A plain string is both the value and the label.
+                                Grade needs them to differ: the value is the
+                                number we store, the label carries the stage. */}
+                            {f.options.map((o) => {
+                              const value = typeof o === "string" ? o : o.value
+                              const label = typeof o === "string" ? o : o.label
+                              return <option key={value} value={value}>{label}</option>
+                            })}
                           </select>
                         ) : (
                           <input

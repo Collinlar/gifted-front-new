@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { getUserHistory } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
+import { gradeShort } from "../lib/grades"
 
 const brandColors = {
   primary: "#103254",
@@ -160,7 +161,7 @@ const CompetitionCard = ({ reg }) => (
       <p className="font-semibold text-sm mb-1 truncate" style={{ color: brandColors.primary }}>{reg.program || reg.name}</p>
       <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
         {reg.year && <span className="flex items-center gap-1"><Calendar size={11} /> {reg.year}</span>}
-        {reg.grade && <span>Grade {reg.grade}</span>}
+        {reg.grade && <span>{gradeShort(reg.grade)}</span>}
         <span className="flex items-center gap-1"><Clock size={11} /> {reg.created_at ? new Date(reg.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span>
       </div>
     </div>

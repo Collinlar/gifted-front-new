@@ -3,8 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useLocation, Link } from "react-router-dom"
 import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Clock, FileQuestion, ChevronDown, Lock, CheckCircle, X, Zap, Layers } from "lucide-react"
-import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts } from "../lib/api"
+import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts, updateUserDetails } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
+import { parseGrade, matchesGrade, gradeLabel, GRADE_OPTIONS } from "../lib/grades"
 
 const brandColors = {
   primary: "#103254",
@@ -337,30 +338,33 @@ const TrackDetail = () => {
     )
   }
 
-  // Grade filtering
+  // Grade filtering.
+  //
+  // This used to strip the word "Grade" and compare what was left, which held
+  // up for "Grade 8" and fell over for everything else. "Grade 12 (SHS 3)",
+  // the most common stored value, became "12 (SHS 3)" and matched nothing, so
+  // 1,045 students opened a track and found it empty. parseGrade handles all
+  // of it, and gives a number on both sides so the comparison is a number.
   const userProfile = JSON.parse(localStorage.getItem('user') || '{}')
-  const userGrade = String(userProfile.grade || '').replace(/grade\s*/i, '').trim()
+  const userGrade = parseGrade(userProfile.grade)
 
   // Academic year progression (Ghana: new year starts September)
   const now = new Date()
   const currentAcademicYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
   const storedGradeYear = parseInt(localStorage.getItem('grade_academic_year') || '0')
   const showGradePrompt = !gradePromptDismissed && userGrade && storedGradeYear > 0 && storedGradeYear < currentAcademicYear
-  const nextGrade = userGrade ? String(parseInt(userGrade) + 1) : ''
+  // Nobody moves up out of Grade 12
+  const nextGrade = userGrade && userGrade < 12 ? userGrade + 1 : ''
 
   // Set grade_academic_year on first load if not set
   if (userGrade && !storedGradeYear) {
     localStorage.setItem('grade_academic_year', String(currentAcademicYear))
   }
 
-  const matchesUserGrade = (item) => {
-    if (!userGrade) return true
-    const grades = Array.isArray(item.grade)
-      ? item.grade.map(g => String(g).replace(/grade\s*/i, '').trim())
-      : item.grade ? [String(item.grade).replace(/grade\s*/i, '').trim()] : []
-    if (grades.length === 0) return true  // untagged = visible to all grades
-    return grades.includes(userGrade)
-  }
+  // A student whose grade we do not know yet sees everything rather than
+  // nothing, which is what keeps them from staring at a blank track while
+  // they wait to be asked.
+  const matchesUserGrade = (item) => matchesGrade(userGrade, item.grade)
 
   // Both gates must pass: item must be published AND match user's grade
   const isPublished = (item) => {
@@ -645,15 +649,24 @@ const TrackDetail = () => {
         {showGradePrompt && (
           <div className="mb-6 rounded-xl border px-5 py-4 flex items-start justify-between gap-4" style={{ backgroundColor: '#FEF3E2', borderColor: '#E8A020' }}>
             <div>
-              <p className="text-sm font-semibold text-amber-900">New academic year. Still in Grade {userGrade}?</p>
+              <p className="text-sm font-semibold text-amber-900">New academic year. Still in {gradeLabel(userGrade)}?</p>
               <p className="text-xs text-amber-700 mt-0.5">If you moved up, update your grade so your content stays relevant.</p>
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const updated = { ...userProfile, grade: nextGrade }
                     localStorage.setItem('user', JSON.stringify(updated))
                     localStorage.setItem('grade_academic_year', String(currentAcademicYear))
                     setGradePromptDismissed(true)
+                    // This only ever wrote to local storage, so moving up
+                    // lasted until the student signed in somewhere else and
+                    // the old grade came back. It goes to the database now.
+                    try {
+                      const uid = getTokenUserId()
+                      if (uid) await updateUserDetails(uid, { grade: nextGrade })
+                    } catch (e) {
+                      console.error('Could not save the new grade:', e)
+                    }
                     window.location.reload()
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
@@ -682,7 +695,7 @@ const TrackDetail = () => {
         {userGrade && (
           <div className="mb-4">
             <span className="text-xs text-gray-500">
-              Showing content for <span className="font-semibold text-gray-700">Grade {userGrade}</span>
+              Showing content for <span className="font-semibold text-gray-700">{gradeLabel(userGrade)}</span>
               {hiddenByGrade > 0 && (
                 <span className="text-gray-400"> · {hiddenByGrade} item{hiddenByGrade > 1 ? 's' : ''} from other grades not shown</span>
               )}
@@ -741,8 +754,8 @@ const TrackDetail = () => {
                 style={{ borderColor: brandColors.border }}
               >
                 <option value="">Select grade</option>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(g => (
-                  <option key={g} value={String(g)}>Grade {g}</option>
+                {GRADE_OPTIONS.map(o => (
+                  <option key={o.value} value={String(o.value)}>{o.label}</option>
                 ))}
               </select>
             </div>

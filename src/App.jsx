@@ -20,22 +20,14 @@ import FeaturedQuizzes from "./Pages/FeaturedQuizzes";
 import AIAgent from "./Pages/AIAgent";
 import Diagnostics from "./Pages/Diagnostics";
 import { useContext,useEffect, useState } from "react";
-import Select from "./Pages/SelectGraduatWP";
 
-import SelectParent from "./Pages/SelectParent";
-import SelectStudent from "./Pages/SelectStudent";
 import { storeContext } from './Context'
-import SelectCategory from "./Pages/SelectCategory";
-import SelectHighSchool from "./Pages/SelectHighSchool";
-import SelectPrimary from "./Pages/SelectPrimary";
-import InputSchool from "./Pages/InputSchool";
 import SubDetails from "./Pages/subDetails"
 import Invoice from "./Pages/Invoice";
 import axios from "axios";
 import Login from "./Pages/Login";
 // import { useLocation } from "react-router-dom";
 import LandingPages from "./Pages/landingPage";
-import SignUp from "./Pages/SignUp";
 import Question from "./Pages/Question"
 import QuizOverview from "./Pages/QuizOverview";
 import ProgramsPage from "./Pages/Programs";
@@ -181,18 +173,9 @@ function App() {
 				    any money, so it is gone rather than left reachable. */}
 				<Route path='/invoice' element={<Payments />} />
 				<Route path='/diagnostics' element={<Diagnostics />} />
-				<Route element={<Select competitionList={competitionList}/>} path='/purpose'/>
 				<Route element={<Auth/>} path="/sign-up"/>
-				<Route element={<SignUp/>} path="/sign-up-legacy"/>
-				<Route element={<SelectParent/>} path='/select-parent'/>
-				<Route element={<SelectStudent/>} path='/select-student'/>
-				<Route element={<SelectCategory/>} path="/select-category"/>
-				<Route element={<SelectHighSchool/>} path='/select-highschool'/>
 				<Route element={<Auth/>} path="/login"/>
 				<Route element={<Login/>} path="/login-legacy"/>
-				
-				<Route element={<SelectPrimary/>} path='/select-primary'/>
-				<Route element={<InputSchool/>} path='/input-school'/>
 				<Route element={<SubDetails/>} path='/details/:id'/>
 				<Route element={<Invoice/>} path='/subitem/:name'/>
 				{/* <Route element={<Questions/>} path="/quiz-questions"/> */}

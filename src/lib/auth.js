@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { supabaseAdmin } from './supabaseAdmin'
 import { jwtDecode } from 'jwt-decode'
+import { parseGrade } from './grades'
 import { getAllTracks, setUserTracks } from './api'
 
 // Interest checkboxes at signup use the `interests` table's name column
@@ -200,6 +201,10 @@ export async function registerUser(registerData) {
   }
 
   // Create auth user — email_confirm:true skips the confirmation email
+  // users.grade is an integer 1 to 12. An empty string would be rejected
+  // outright, and a legacy label like "SHS 3" has to become 12 rather than 3.
+  const gradeVal = parseGrade(grade)
+
   const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
     email: cleanEmail,
     password: cleanPassword,
@@ -214,7 +219,7 @@ export async function registerUser(registerData) {
       country:           country    ?? '',
       educational_level: educationalLevel ?? '',
       school_name:       schoolVal,
-      grade:             grade      ?? '',
+      grade:             gradeVal,
       purpose_of_registration: purposes,
     },
   })
@@ -238,7 +243,7 @@ export async function registerUser(registerData) {
     gender:                  gender       ?? '',
     category:                catVal,
     country:                 country      ?? '',
-    grade:                   grade        ?? '',
+    grade:                   gradeVal,
     purpose_of_registration: purposes,
     created_at:              new Date().toISOString(),
   }
