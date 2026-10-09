@@ -3,13 +3,19 @@ import { supabase } from './supabase'
 // The homepage's words, and where they come from.
 //
 // They live in homepage_sections so the team can change a closing date without
-// a deploy. But the homepage is the first thing anyone sees, so it must never
-// depend on that request succeeding: if the table is missing, the network is
-// slow, or a section was deleted by mistake, the page falls back to what is
-// written here and renders exactly as it always did.
+// a deploy.
 //
-// These defaults are the same content the migration seeds, kept in step on
-// purpose. Nothing here is a placeholder waiting to be filled in.
+// DEFAULTS below is the last resort and nothing else. It used to render while
+// the real content was being fetched, on the reasoning that a headline which
+// changes a moment later beats a spinner. That was wrong. The seed drifted
+// from what the team actually publishes, and by October 2026 every single
+// section differed: six programmes that do not exist, a different headline,
+// and a footer carrying the wrong email and the wrong phone number, all on
+// screen for about a second before the real page replaced it.
+//
+// So the order is now: whatever we cached from this visitor's last visit,
+// then the live fetch, and DEFAULTS only if the fetch actually fails. A page
+// that is briefly incomplete is better than a page that is briefly untrue.
 
 export const DEFAULTS = {
   brand: {
@@ -91,6 +97,48 @@ export const DEFAULTS = {
 // Order sections appear in when the table has nothing to say about it
 const ORDER = ["brand", "hero", "programmes", "proof", "steps", "dates", "footer"]
 
+// ── The visitor's last known good copy ─────────────────────────────────────
+//
+// Written after every successful fetch and read synchronously on the next
+// load, so a returning visitor's first paint is already the real page rather
+// than a guess at it. Bumping CACHE_KEY retires every stored copy at once,
+// which is what to do if the shape here ever changes.
+
+const CACHE_KEY = "gifted:homepage:v1"
+
+/** The cached page, or null. Never throws: private mode and cleared storage
+ *  both read as "no cache", which is a fine thing to be. */
+export function readCachedHomepage({ preview = false } = {}) {
+  // A preview is unpublished by definition, so it must never be served from
+  // or written to a cache a real visitor could pick up.
+  if (preview) return null
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw)
+    if (!saved?.sections) return null
+    return {
+      sections: saved.sections,
+      order: saved.order || ORDER,
+      hidden: new Set(saved.hidden || []),   // a Set does not survive JSON
+      source: "cache",
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeCache({ sections, order, hidden }) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      sections, order, hidden: [...hidden],
+    }))
+  } catch {
+    // Storage full, blocked, or private mode. The page still works, the next
+    // visitor just pays for the fetch again.
+  }
+}
+
 /**
  * The homepage as it should render.
  *
@@ -104,6 +152,7 @@ export async function getHomepage({ preview = false } = {}) {
     order: ORDER,
     hidden: new Set(),
     fromDatabase: false,
+    source: "fallback",
   }
 
   try {
@@ -138,7 +187,8 @@ export async function getHomepage({ preview = false } = {}) {
       }
     }
 
-    return { sections, order, hidden, fromDatabase: true }
+    if (!preview) writeCache({ sections, order, hidden })
+    return { sections, order, hidden, fromDatabase: true, source: "live" }
   } catch {
     return fallback
   }

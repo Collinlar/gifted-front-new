@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { T, display, body, useGiftedFonts } from "./giftedTheme"
-import { getHomepage, DEFAULTS, list } from "../lib/homepageContent"
+import { getHomepage, readCachedHomepage, DEFAULTS, list } from "../lib/homepageContent"
 import GiftedLogo from "../Components/common/GiftedLogo"
 
 const ROTATE_MS = 5200
@@ -12,6 +12,14 @@ const ROTATE_MS = 5200
 // page that opens on a statistics strip.
 const MOVEABLE = ["proof", "steps", "dates"]
 
+
+// Holds the space a line of text will occupy while it is on its way.
+// Deliberately wordless: anything written here would be a guess, and a guess
+// on the homepage is what this whole change exists to stop.
+function Bar({ w = "100%", h = 14, className = "" }) {
+  return <span className={`gf-bar ${className}`} style={{ width: w, height: h }} aria-hidden />
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -21,7 +29,10 @@ export default function Home() {
   // the real page rather than on an approximation of it
   const preview = params.get("preview") === "1"
 
-  const [page, setPage]     = useState(null)
+  // Seeded from this visitor's last visit, so a returning visitor's first
+  // paint is the real page. Null on a first visit, which is what puts the
+  // placeholders on screen instead of content we would be guessing at.
+  const [page, setPage]     = useState(() => readCachedHomepage({ preview }))
   const [active, setActive] = useState(0)
   const [paused, setPaused] = useState(false)
   const timer = useRef(null)
@@ -34,9 +45,12 @@ export default function Home() {
     return () => { alive = false }
   }, [preview])
 
-  // Render the defaults until the fetch lands. The homepage is the first thing
-  // anyone sees on a slow connection, and a spinner where the headline should
-  // be is worse than a headline that changes a moment later.
+  // Nothing from the database has arrived yet and nothing was cached, so the
+  // page renders its frame with the words held back. DEFAULTS is not used
+  // here on purpose: every section of it has drifted from what the team
+  // publishes, down to the footer's phone number, so showing it would mean
+  // showing a stranger the wrong number for a second.
+  const waiting  = !page
   const sections = page?.sections || DEFAULTS
   const hidden   = page?.hidden || new Set()
 
@@ -90,20 +104,34 @@ export default function Home() {
   const blocks = {
     proof: !hidden.has("proof") && (
       <section key="proof" id="proof" className="gf-proof">
-        {list(proof.stats, DEFAULTS.proof.stats).map((s, i) => (
+        {waiting && [0, 1].map((i) => (
+          <div key={i}>
+            <div className="gf-stat"><Bar w="120px" h="0.7em" /></div>
+            <div className="gf-statLabel"><Bar w="150px" h={10} /></div>
+          </div>
+        ))}
+        {!waiting && list(proof.stats, DEFAULTS.proof.stats).map((s, i) => (
           <div key={`${s.label}-${i}`}>
             <div className="gf-stat">{s.value}</div>
             <div className="gf-statLabel">{s.label}</div>
           </div>
         ))}
-        {proof.line && <p className="gf-proofLine">{proof.line}</p>}
+        {waiting ? <p className="gf-proofLine"><Bar w="92%" /><Bar w="74%" /></p>
+                 : proof.line && <p className="gf-proofLine">{proof.line}</p>}
       </section>
     ),
 
     steps: !hidden.has("steps") && (
       <section key="steps" id="steps" className="gf-steps">
-        <div className="gf-sectionKicker">{steps.kicker}</div>
-        {list(steps.items, DEFAULTS.steps.items).map((s, i) => (
+        <div className="gf-sectionKicker">{waiting ? <Bar w="100px" h={10} /> : steps.kicker}</div>
+        {waiting && [0, 1, 2].map((i) => (
+          <div key={i} className="gf-step">
+            <span className="gf-stepNum">{String(i + 1).padStart(2, "0")}</span>
+            <h3 className="gf-stepTitle"><Bar w="70%" h="0.8em" /></h3>
+            <p className="gf-stepBody"><Bar w="96%" /><Bar w="82%" /></p>
+          </div>
+        ))}
+        {!waiting && list(steps.items, DEFAULTS.steps.items).map((s, i) => (
           <div key={`${s.title}-${i}`} className="gf-step">
             <span className="gf-stepNum">{s.n}</span>
             <h3 className="gf-stepTitle">{s.title}</h3>
@@ -116,11 +144,20 @@ export default function Home() {
     dates: !hidden.has("dates") && (
       <section key="dates" id="dates" className="gf-dates">
         <div className="gf-datesHead">
-          <h2 className="gf-h2">{dates.heading}</h2>
-          {dates.note && <p className="gf-datesNote">{dates.note}</p>}
+          <h2 className="gf-h2">{waiting ? <Bar w="min(320px, 80%)" h="0.8em" /> : dates.heading}</h2>
+          {waiting ? <p className="gf-datesNote"><Bar w="60%" /></p>
+                   : dates.note && <p className="gf-datesNote">{dates.note}</p>}
         </div>
 
-        {list(dates.items, DEFAULTS.dates.items).map((e, i) => (
+        {waiting && [0, 1, 2].map((i) => (
+          <div key={i} className="gf-event gf-eventWait">
+            <span className="gf-eventTerm"><Bar w="54px" h={10} /></span>
+            <h3 className="gf-eventName"><Bar w={["58%", "44%", "50%"][i]} h="0.8em" /></h3>
+            <span className="gf-eventWhat"><Bar w="80%" /></span>
+          </div>
+        ))}
+
+        {!waiting && list(dates.items, DEFAULTS.dates.items).map((e, i) => (
           <div key={`${e.name}-${i}`} className="gf-event">
             <span className="gf-eventTerm">{e.term}</span>
             <h3 className="gf-eventName">{e.name}</h3>
@@ -134,11 +171,16 @@ export default function Home() {
 
         {!hidden.has("footer") && (
           <footer className="gf-footer">
-            <span className="gf-footBrand">{footer.brand}</span>
-            {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
-            {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
-            {footer.address && <span>{footer.address}</span>}
-            {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+            {/* The seeded defaults carried an old email and an old phone
+                number. Nobody should be shown a number to ring that we are
+                only guessing at. */}
+            <span className="gf-footBrand">{waiting ? <Bar w="80px" h={18} /> : footer.brand}</span>
+            {waiting ? <><Bar w="150px" /><Bar w="130px" /><Bar w="170px" /></> : <>
+              {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
+              {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
+              {footer.address && <span>{footer.address}</span>}
+              {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+            </>}
           </footer>
         )}
       </section>
@@ -151,11 +193,16 @@ export default function Home() {
   const orphanFooter = hidden.has("dates") && !hidden.has("footer") && (
     <section key="footer" className="gf-dates">
       <footer className="gf-footer">
-        <span className="gf-footBrand">{footer.brand}</span>
-        {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
-        {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
-        {footer.address && <span>{footer.address}</span>}
-        {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+        {/* The seeded defaults carried an old email and an old phone
+            number. Nobody should be shown a number to ring that we are
+            only guessing at. */}
+        <span className="gf-footBrand">{waiting ? <Bar w="80px" h={18} /> : footer.brand}</span>
+        {waiting ? <><Bar w="150px" /><Bar w="130px" /><Bar w="170px" /></> : <>
+          {footer.email   && <a href={`mailto:${footer.email}`}>{footer.email}</a>}
+          {footer.phone   && <a href={`tel:${String(footer.phone).replace(/[^\d+]/g, "")}`}>{footer.phone}</a>}
+          {footer.address && <span>{footer.address}</span>}
+          {footer.copyright && <span className="gf-copy">{footer.copyright}</span>}
+        </>}
       </footer>
     </section>
   )
@@ -175,7 +222,7 @@ export default function Home() {
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="gf-hero">
-        {items.map((p, i) => (
+        {!waiting && items.map((p, i) => (
           <div
             key={`${p.title}-${i}`}
             aria-hidden
@@ -191,35 +238,51 @@ export default function Home() {
               {/* The mark, not the full lockup: the wordmark beside it stays
                   admin editable, and the lockup carries its own. */}
               <GiftedLogo variant="mark" tone="bone" height={34} className="gf-mark" />
-              <span className="gf-wordmark">{brand.wordmark}</span>
-              <span className="gf-kicker">{brand.kicker}</span>
+              {/* The mark is an asset and always correct. The wordmark and
+                  kicker are editable copy, so they wait their turn. */}
+              <span className="gf-wordmark">{waiting ? <Bar w="90px" h={18} /> : brand.wordmark}</span>
+              <span className="gf-kicker">{waiting ? <Bar w="110px" h={9} /> : brand.kicker}</span>
             </a>
             <nav className="gf-nav">
-              {list(brand.nav, DEFAULTS.brand.nav).map((n, i) => (
+              {!waiting && list(brand.nav, DEFAULTS.brand.nav).map((n, i) => (
                 <button key={`${n.label}-${i}`} onClick={() => go(n.target)}>{n.label}</button>
               ))}
+              {/* Sign in is a route, not editable copy, so it never waits. */}
               <button className="gf-navSignIn" onClick={() => navigate("/login")}>
-                {brand.signInLabel || "Sign in"}
+                {waiting ? "Sign in" : (brand.signInLabel || "Sign in")}
               </button>
             </nav>
           </header>
 
           <div className="gf-heroGrid">
             <div className="gf-heroCopy">
-              {hero.eyebrow && <div className="gf-eyebrow">{hero.eyebrow}</div>}
-              <h1 className="gf-h1">
-                {headline.map((line, i) => (
-                  <span key={i}>{line}{i < headline.length - 1 && <br />}</span>
-                ))}
-              </h1>
-              {hero.lede && <p className="gf-lede">{hero.lede}</p>}
+              {waiting ? (
+                <>
+                  <div className="gf-eyebrow"><Bar w="140px" h={10} /></div>
+                  <h1 className="gf-h1 gf-h1Wait">
+                    <Bar w="86%" h="0.86em" /><Bar w="72%" h="0.86em" />
+                  </h1>
+                  <p className="gf-lede"><Bar w="94%" /><Bar w="78%" /></p>
+                </>
+              ) : (
+                <>
+                  {hero.eyebrow && <div className="gf-eyebrow">{hero.eyebrow}</div>}
+                  <h1 className="gf-h1">
+                    {headline.map((line, i) => (
+                      <span key={i}>{line}{i < headline.length - 1 && <br />}</span>
+                    ))}
+                  </h1>
+                  {hero.lede && <p className="gf-lede">{hero.lede}</p>}
+                </>
+              )}
               <div className="gf-cta">
-                {hero.primaryLabel && (
+                {waiting && <><Bar w="150px" h={44} className="gf-barBtn" /><Bar w="150px" h={44} className="gf-barBtn" /></>}
+                {!waiting && hero.primaryLabel && (
                   <button className="gf-btnGold" onClick={() => go(hero.primaryTarget)}>
                     {hero.primaryLabel}
                   </button>
                 )}
-                {hero.secondaryLabel && (
+                {!waiting && hero.secondaryLabel && (
                   <button className="gf-btnGhost" onClick={() => go(hero.secondaryTarget)}>
                     {hero.secondaryLabel}
                   </button>
@@ -228,8 +291,14 @@ export default function Home() {
             </div>
 
             <div className="gf-index" id="programmes">
-              <div className="gf-indexHead">{programmes.heading}</div>
-              {items.map((p, i) => (
+              <div className="gf-indexHead">{waiting ? <Bar w="90px" h={10} /> : programmes.heading}</div>
+              {waiting && [0, 1, 2].map((i) => (
+                <div key={i} className="gf-row gf-rowWait">
+                  <span className="gf-rowNum">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="gf-rowTitle"><Bar w={["62%", "44%", "54%"][i]} /></span>
+                </div>
+              ))}
+              {!waiting && items.map((p, i) => (
                 <button
                   key={`${p.title}-${i}`}
                   className={`gf-row ${i === active ? "is-active" : ""}`}
@@ -247,7 +316,9 @@ export default function Home() {
           </div>
 
           <div className="gf-heroFoot">
-            <p className="gf-activeLine" aria-live="polite">{current.line}</p>
+            <p className="gf-activeLine" aria-live="polite">
+              {waiting ? <Bar w="55%" /> : current.line}
+            </p>
             <button className="gf-scroll" aria-label="Scroll to programmes" onClick={() => scrollTo("proof")}>
               <span className="gf-chev" />
             </button>
@@ -280,6 +351,16 @@ const CSS = `
 
 /* Hero */
 .gf-hero{position:relative;min-height:100svh;overflow:hidden;background:${T.ink};display:flex}
+/* Placeholder bars. Bone at low opacity so they read as part of the page
+   rather than as an error, and they breathe slowly so it is clear something
+   is still coming. Reduced motion switches the breathing off below. */
+.gf-bar{display:block;border-radius:3px;background:rgba(246,245,242,.13);animation:gf-breathe 1.6s ease-in-out infinite}
+.gf-bar + .gf-bar{margin-top:7px}
+.gf-barBtn{display:inline-block;border-radius:0;margin-right:10px}
+.gf-h1Wait .gf-bar{background:rgba(246,245,242,.17)}
+.gf-rowWait,.gf-eventWait{pointer-events:none}
+.gf-dates .gf-bar{background:rgba(11,31,51,.09)}
+@keyframes gf-breathe{0%,100%{opacity:.55}50%{opacity:1}}
 .gf-slide{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity 1100ms cubic-bezier(.4,0,.2,1)}
 .gf-scrim{position:absolute;inset:0;background:linear-gradient(105deg,rgba(8,24,42,.94) 0%,rgba(8,24,42,.80) 46%,rgba(8,24,42,.42) 100%)}
 .gf-heroInner{position:relative;flex:1;display:flex;flex-direction:column;padding:0 clamp(20px,3.4vw,56px);min-width:0}
@@ -387,6 +468,7 @@ const CSS = `
 
 @media (prefers-reduced-motion:reduce){
   .gf-slide{transition:none}
+  .gf-bar{animation:none}
   .gf-chev{animation:none}
 }
 `
