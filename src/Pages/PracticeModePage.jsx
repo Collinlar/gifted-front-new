@@ -148,7 +148,7 @@ export default function PracticeModePage() {
       setHint(text)
       setHintsUsed(h => h + 1)
     } catch {
-      setHint('Focus on the key concept in the question. What is it really asking you to compare or identify?')
+      setHint('')
     } finally {
       setLoadingHint(false)
     }
@@ -389,7 +389,14 @@ export default function PracticeModePage() {
                   >
                     <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-amber-800">
-                      {loadingHint ? 'Getting your hint...' : hint}
+                      {loadingHint ? 'Getting your hint...' : hint || (
+                        <>
+                          We couldn’t get a hint for this question.{' '}
+                          <button type="button" onClick={handleHint} className="font-semibold underline">
+                            Retry hint
+                          </button>
+                        </>
+                      )}
                     </p>
                   </motion.div>
                 )}
