@@ -11,6 +11,7 @@ import { storeContext } from "../Context";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { getQuizDetails, getAllLearningResourceAnalytics, getUserDetails, getUserTracks, getTrackContent } from "../lib/api";
+import { visibleTrackResources } from "../lib/trackResources";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import AnnouncementsSection from "./AnnouncementsSection";
 import GradePrompt from "../Components/common/GradePrompt";
@@ -249,7 +250,7 @@ const OverviewPage = () => {
             name: t.name,
             color: t.color || "#2666A6",
             competitions: res.competitions.length,
-            courses: res.courses.length,
+            courses: visibleTrackResources(res.courses, profile.grade).length,
             exams: res.exams.length,
             completedCount: completedInTrack.length,
             avgScore,
@@ -693,7 +694,7 @@ const OverviewPage = () => {
             <div className="bg-white rounded-xl shadow-md p-6 overflow-hidden">
               <h3 className="text-xl font-semibold text-[#103254] mb-4">Learning Focus</h3>
               {trackStats.every(s => s.courses === 0) ? (
-                <div className="h-64 flex items-center justify-center text-gray-400 text-sm">No resources tagged into your tracks yet.</div>
+                <div className="h-64 flex items-center justify-center text-gray-400 text-sm">No resources available in your tracks yet.</div>
               ) : (
                 <div className="h-64 flex justify-center items-center">
                   <ResponsiveContainer width="100%" height="100%">

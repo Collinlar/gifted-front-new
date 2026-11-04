@@ -6,6 +6,7 @@ import { Trophy, Tent, BookOpen, ClipboardCheck, TrendingUp, Compass, MapPin, Cl
 import { getTrackBySlug, getTrackContent, getQuizDetails, registerForCamp, markExamsSeen, getUserCompetitionRegistrations, registerForCompetition, getExamAttempts, updateUserDetails } from "../lib/api"
 import { getTokenUserId } from "../lib/auth"
 import { parseGrade, matchesGrade, gradeLabel, GRADE_OPTIONS } from "../lib/grades"
+import { isPublishedTrackItem as isPublished, visibleTrackResources } from "../lib/trackResources"
 
 const brandColors = {
   primary: "#103254",
@@ -366,13 +367,7 @@ const TrackDetail = () => {
   // they wait to be asked.
   const matchesUserGrade = (item) => matchesGrade(userGrade, item.grade)
 
-  // Both gates must pass: item must be published AND match user's grade
-  const isPublished = (item) => {
-    // Supabase column is "publish" (set by admin). Fall back to "published" for other content types.
-    const flag = item.publish ?? item.published
-    if (flag === undefined || flag === null) return true  // no publish column = visible by default
-    return flag === true || flag === 1 || flag === 'true'
-  }
+  const resources = visibleTrackResources(content.courses, userGrade)
 
   // Group flashcards by subject for display — each group becomes one study card
   const flashcardGroups = (() => {
@@ -399,7 +394,7 @@ const TrackDetail = () => {
     ? [...(content.exams || []).filter(isPublished), ...flashcardGroups]
     : (content[activeTab] || []).filter(isPublished)
 
-  const activeItems = activeTab === 'exams'
+  const activeItems = activeTab === 'courses' ? resources : activeTab === 'exams'
     ? [
         ...(content.exams || []).filter(isPublished).filter(matchesUserGrade),
         ...flashcardGroups,  // flashcard groups shown to all grades — grade is metadata on each card
@@ -415,6 +410,7 @@ const TrackDetail = () => {
   // promise and then went looking for the other ten. It now counts exactly
   // what that tab will show them, using the same two filters the cards use.
   const countForTab = (key) => {
+    if (key === 'courses') return resources.length
     if (key === 'exams') {
       return (content.exams || []).filter(isPublished).filter(matchesUserGrade).length
         + flashcardGroups.length   // shown to every grade, so never filtered out
@@ -598,7 +594,7 @@ const TrackDetail = () => {
         {/* Progress tracker — overlaps the banner slightly for a layered feel */}
         <div className="rounded-2xl bg-white shadow-lg border p-6 mb-8 grid grid-cols-2 sm:grid-cols-4 gap-6" style={{ borderColor: brandColors.border }}>
           <StatCard icon={<Trophy size={18} />} label="Competitions" value={content.competitions.length} color={color} />
-          <StatCard icon={<BookOpen size={18} />} label="Resources" value={content.courses.length} color={color} />
+          <StatCard icon={<BookOpen size={18} />} label="Resources" value={resources.length} color={color} />
           <StatCard icon={<ClipboardCheck size={18} />} label="Assessments Done" value={`${trackProgress.completedCount}/${trackProgress.totalExams}`} color={color} />
           <StatCard icon={<TrendingUp size={18} />} label="Average Score" value={trackProgress.completedCount ? `${trackProgress.avgScore}%` : "—"} color={brandColors.success} />
         </div>

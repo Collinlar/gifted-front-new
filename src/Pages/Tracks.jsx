@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowRight, Plus, Compass, Trophy, BookOpen, ClipboardCheck, Tent } from "lucide-react"
 import { getAllTracks, getUserTracks, setUserTracks, getTrackContent } from "../lib/api"
+import { visibleTrackResources } from "../lib/trackResources"
 import { getTokenUserId } from "../lib/auth"
 
 const brandColors = {
@@ -105,13 +106,14 @@ const Tracks = () => {
         // Pull quick content counts only for the user's own tracks
         const myTracks = tracks.filter((t) => myIds.includes(t.id))
         const statResults = await Promise.all(myTracks.map((t) => getTrackContent(t.id).catch(() => null)))
+        const { grade } = JSON.parse(localStorage.getItem("user") || "{}")
         const nextStats = {}
         myTracks.forEach((t, i) => {
           const res = statResults[i]
           if (res) {
             nextStats[t.id] = {
               competitions: res.competitions.length,
-              courses: res.courses.length,
+              courses: visibleTrackResources(res.courses, grade).length,
               exams: res.exams.length,
               camps: res.camps.length,
             }

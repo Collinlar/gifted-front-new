@@ -1300,7 +1300,10 @@ export async function getTrackContent(trackId) {
       ? supabaseAdmin.from('competitions').select('*').in('id', idsByType.competition).then(r => r.data || [])
       : Promise.resolve([]),
     idsByType.course?.length
-      ? supabaseAdmin.from('courses').select('*').in('id', idsByType.course).then(r => r.data || [])
+      ? supabaseAdmin.from('courses').select('*').in('id', idsByType.course).then(({ data, error }) => {
+          if (error) throw error
+          return data || []
+        })
       : Promise.resolve([]),
     idsByType.exam?.length
       ? supabaseAdmin.from('exams').select('*').in('id', idsByType.exam).eq('publish', true).then(r => r.data || []).then(rows => rows.map(normalizeExam))
