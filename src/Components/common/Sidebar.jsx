@@ -31,6 +31,7 @@ const SIDEBAR_GROUPS = [
       { name: "Dashboard", icon: Home, href: "/overview" },
       { name: "My Tracks", icon: Compass, href: "/tracks" },
       { name: "My Registrations", icon: ClipboardList, href: "/my-registrations" },
+      { name: "My Exams", icon: ClipboardList, href: "/my-exams" },
       { name: "My History", icon: Clock, href: "/history" },
     ],
   },

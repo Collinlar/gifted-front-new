@@ -1,10 +1,11 @@
+import ExamAccountPrompt from "../Components/ExamAccountPrompt"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Clock, ShieldAlert, CheckCircle2, AlertCircle, Send, Loader2, Flag,
   Pause as PauseIcon,
 } from "lucide-react"
 import {
-  examGetPaper, examSaveProgress, examHeartbeat, examLogEvent, examSubmit,
+  examGetPaper, examSaveProgress, examHeartbeat, examLogEvent, examSubmit, clearToken,
 } from "../lib/examApi"
 
 const NAVY = "#103254"
@@ -13,7 +14,7 @@ const MID  = "#2666A6"
 const HEARTBEAT_MS = 20000  // server truth for the clock
 const AUTOSAVE_MS  = 15000
 
-export default function ExamRunner({ token, onFinished }) {
+export default function ExamRunner({ token, onFinished, sessionCode }) {
   const [paper,   setPaper]   = useState(null)
   const [loading, setLoading] = useState(true)
   const [fatal,   setFatal]   = useState("")
@@ -62,6 +63,7 @@ export default function ExamRunner({ token, onFinished }) {
     setSubmitting(true)
     try {
       const res = await examSubmit(token, answersRef.current, auto)
+      clearToken(sessionCode)
       setResult({ ...res, auto })
     } catch (e) {
       setFatal(e.message)
@@ -69,7 +71,7 @@ export default function ExamRunner({ token, onFinished }) {
     } finally {
       setSubmitting(false)
     }
-  }, [token])
+  }, [token, sessionCode])
 
   // ── Server-enforced clock ────────────────────────────────────────────────
   // The countdown on screen is cosmetic. Every 20 seconds the server tells us
@@ -222,6 +224,7 @@ export default function ExamRunner({ token, onFinished }) {
       ) : (
         <p className="text-sm mb-3" style={{ color: MID }}>Your results will be released by your invigilator.</p>
       )}
+      <ExamAccountPrompt sessionCode={sessionCode} />
       <button onClick={onFinished} className="mt-3 px-5 py-2.5 rounded-xl text-white font-semibold" style={{ backgroundColor: NAVY }}>
         Close
       </button>

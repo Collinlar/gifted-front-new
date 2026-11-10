@@ -1,3 +1,4 @@
+import ExamAccountPrompt from "../Components/ExamAccountPrompt"
 import { CheckCircle2, XCircle, MinusCircle, Award, Download, BadgeCheck } from "lucide-react"
 import QuestionImage from "../Components/common/QuestionImage"
 
@@ -10,10 +11,10 @@ const ADMIN_API = import.meta.env.VITE_ADMIN_API_URL || "https://gifted-admin.ne
 
 // Shown when a candidate signs back in after submitting. What appears depends
 // on what the invigilator has released: results, a certificate, or both.
-export default function ExamResults({ results, onClose }) {
+export default function ExamResults({ results, onClose, sessionCode }) {
   const {
     candidateName, examTitle, score, total, submittedAt,
-    breakdown, showBreakdown, certificate, resultsOut,
+    breakdown, showBreakdown, certificate, resultsOut, entrySource,
   } = results
   const pct = total ? Math.round((score / total) * 100) : 0
 
@@ -46,9 +47,12 @@ export default function ExamResults({ results, onClose }) {
             </p>
           )}
 
+          {entrySource === "paper" && <p className="text-sm mb-3" style={{ color: MID }}>
+            Paper-based exam. Your manually marked result is included in this sitting.
+          </p>}
           {submittedAt && (
             <p className="text-xs" style={{ color: MID }}>
-              Submitted {new Date(submittedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              {entrySource === "paper" ? "Recorded" : "Submitted"} {new Date(submittedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
             </p>
           )}
         </div>
@@ -80,7 +84,7 @@ export default function ExamResults({ results, onClose }) {
           </a>
         )}
 
-        {showBreakdown && breakdown?.length > 0 && (
+        {entrySource !== "paper" && showBreakdown && breakdown?.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-semibold mb-3" style={{ color: NAVY }}>Question by question</h2>
             <div className="divide-y divide-gray-100">
@@ -127,9 +131,11 @@ export default function ExamResults({ results, onClose }) {
 
         {resultsOut && !showBreakdown && (
           <p className="text-center text-sm" style={{ color: MID }}>
-            Question by question feedback is not being shown for this exam.
+            {entrySource === "paper" ? "Only total marks were imported for your paper-based exam." : "Question by question feedback is not being shown for this exam."}
           </p>
         )}
+
+        {sessionCode && <ExamAccountPrompt sessionCode={sessionCode} />}
 
         <button onClick={onClose}
           className="w-full py-3 rounded-xl font-semibold text-white"

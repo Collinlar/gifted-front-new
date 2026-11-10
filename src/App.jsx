@@ -6,6 +6,7 @@ import Sidebar from "./Components/common/Sidebar";
 
 import OverviewPage from "./Pages/OverviewPage";
 import ExamPortal from "./Pages/ExamPortal";
+import MyExams from "./Pages/MyExams";
 import VerifyCertificate from "./Pages/VerifyCertificate";
 import Home from "./Pages/Home";
 import Auth from "./Pages/Auth";
@@ -80,7 +81,7 @@ import useGATracking from "./Pages/UseGATracking";
 // import the sidebar themselves, and why the marketplace grew its own header
 // instead. A list is something you can add a line to.
 const SIDEBAR_ROUTES = [
-  "/overview", "/tracks", "/history", "/profile", "/my-registrations",
+  "/overview", "/tracks", "/my-exams", "/history", "/profile", "/my-registrations",
   "/programs", "/learning-management", "/assessment-management",
   "/marketplace", "/checkout", "/my-library", "/payments", "/invoice-page",
   "/calendar-page", "/community", "/ai-agent", "/diagnostics", "/invoice",
@@ -187,6 +188,7 @@ function App() {
 				<Route element={<MyRegistrations/>} path="/my-registrations"/>
 
 				<Route element={<ExamPortal/>} path="/exam/:sessionCode"/>
+                <Route element={<MyExams/>} path="/my-exams"/>
 
 				{/* Public certificate check. No sign in, by design: the whole
 				    value of a serial is that a school or employer can verify it. */}

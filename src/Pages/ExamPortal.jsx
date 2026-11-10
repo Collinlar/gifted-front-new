@@ -31,7 +31,7 @@ export default function ExamPortal() {
   }
 
   if (results) {
-    return <ExamResults results={results} onClose={() => setResults(null)} />
+    return <ExamResults sessionCode={sessionCode} results={results} onClose={() => setResults(null)} />
   }
 
   if (!token) {

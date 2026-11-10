@@ -75,3 +75,17 @@ export const tokenKey = (code) => `exam_token_${String(code).toUpperCase()}`
 export const readToken  = (code) => localStorage.getItem(tokenKey(code))
 export const saveToken  = (code, t) => localStorage.setItem(tokenKey(code), t)
 export const clearToken = (code) => localStorage.removeItem(tokenKey(code))
+
+// Account operations use the live Supabase session. Ownership is derived by SQL
+// from auth.uid(), never from localStorage profile fields or a supplied user ID.
+async function accountRpc(name, params = {}) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
+  try { return unwrap(await supabase.rpc(name, params).abortSignal(controller.signal)) }
+  finally { clearTimeout(timeout) }
+}
+export const claimExamResult = (sessionCode, accessCode, password) => accountRpc('exam_claim_result', {
+  p_session_code: sessionCode, p_access_code: accessCode, p_password: password,
+})
+export const getMyExams = () => accountRpc('exam_my_results')
+export const getMyExamResult = candidateId => accountRpc('exam_my_result', { p_candidate_id: candidateId })

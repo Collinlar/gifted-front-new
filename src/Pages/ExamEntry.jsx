@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom"
+import { examAccountPath } from "../lib/examAccountLinks"
 import { useState } from "react"
 import { KeyRound, Lock, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react"
 import { examLogin } from "../lib/examApi"
@@ -108,6 +110,7 @@ export default function ExamEntry({ sessionCode, onAuthenticated }) {
             Once you begin, your time starts and runs on our server. Closing this page will not pause it.
           </p>
         </form>
+        <Link to={examAccountPath(sessionCode)} className="block text-center mt-5 py-3 text-sm font-semibold text-[#103254] underline">Already completed an exam? Save it to your Gifted account</Link>
       </div>
     </div>
   )

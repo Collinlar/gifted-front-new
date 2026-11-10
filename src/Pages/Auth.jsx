@@ -1,3 +1,4 @@
+import { safeAuthNext } from "../lib/examAccountLinks"
 import { useEffect, useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { loginUser, registerUser } from "../lib/auth"
@@ -77,6 +78,8 @@ const NEXT_STEPS = [
 export default function Auth() {
   const navigate = useNavigate()
   const location = useLocation()
+  const nextPath = safeAuthNext(location.search)
+  const returningToExam = nextPath.startsWith("/my-exams")
 
   const [view, setView]   = useState(location.pathname === "/sign-up" ? "signup" : "signin")
   const [step, setStep]   = useState(0)
@@ -112,8 +115,7 @@ export default function Auth() {
         // Someone who hit "Sign in first" from a registration form is sent
         // back to that form, not to the dashboard. Only same-site paths are
         // followed, so this cannot be used to bounce anyone off the site.
-        const next = new URLSearchParams(window.location.search).get("next")
-        navigate(next && next.startsWith("/") && !next.startsWith("//") ? next : "/overview")
+        navigate(nextPath)
       }
       else setError(res.message || "Incorrect email or password. Try again.")
     } catch {
@@ -346,18 +348,17 @@ export default function Auth() {
                 <div className="ga-tick">✓</div>
                 <h1 className="ga-h1">Account created.</h1>
                 <p className="ga-sub">
-                  You are signed in. Next: pick a cohort and take the short placement diagnostic
-                  so we can put you on the right track.
+                  {returningToExam ? "You are signed in. Use your exam slip to save your result and certificate to this account." : "You are signed in. Next: pick a cohort and take the short placement diagnostic so we can put you on the right track."}
                 </p>
-                <div className="ga-next">
+                {!returningToExam && <div className="ga-next">
                   {NEXT_STEPS.map((n) => (
                     <div key={n.n} className="ga-nextRow">
                       <span className="ga-nextNum">{n.n}</span>
                       <span className="ga-nextText">{n.t}</span>
                     </div>
                   ))}
-                </div>
-                <button className="ga-submit ga-bone" onClick={() => navigate("/overview")}>Go to the portal</button>
+                </div>}
+                <button className="ga-submit ga-bone" onClick={() => navigate(nextPath)}>{returningToExam ? "Save my exam" : "Go to the portal"}</button>
               </div>
             )}
           </div>
