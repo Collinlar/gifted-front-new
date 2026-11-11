@@ -31,9 +31,31 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
   const [result,      setResult]      = useState(null)
   const [warning,     setWarning]     = useState(null)
 
+  const saveQueueRef = useRef(Promise.resolve())
+  const [saveError, setSaveError] = useState("")
   const answersRef  = useRef(answers)
   const submittedRef = useRef(false)
   answersRef.current = answers
+
+  const persistAnswers = useCallback(() => {
+    const job = saveQueueRef.current.catch(() => {}).then(async () => {
+      if (submittedRef.current) return
+      setSaving(true)
+      try {
+        const saved = await examSaveProgress(token, answersRef.current)
+        if (saved.submission) {
+          submittedRef.current = true
+          clearToken(sessionCode)
+          setResult(saved.submission)
+        }
+        setSaveError("")
+      } catch {
+        setSaveError("Your latest answers could not be saved. Keep this page open while we retry.")
+      } finally { setSaving(false) }
+    })
+    saveQueueRef.current = job
+    return job
+  }, [token, sessionCode])
 
   // ── Load the paper ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -42,6 +64,12 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
       try {
         const p = await examGetPaper(token)
         if (!alive) return
+        if (p.completed) {
+          submittedRef.current = true
+          clearToken(sessionCode)
+          setResult(p.submission)
+          return
+        }
         setPaper(p)
         setAnswers(p.savedAnswers || {})
         setPaused(!!p.paused)
@@ -54,7 +82,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
       }
     })()
     return () => { alive = false }
-  }, [token])
+  }, [token, sessionCode])
 
   // ── Submit ───────────────────────────────────────────────────────────────
   const doSubmit = useCallback(async (auto = false) => {
@@ -62,6 +90,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
     submittedRef.current = true
     setSubmitting(true)
     try {
+      await saveQueueRef.current.catch(() => {})
       const res = await examSubmit(token, answersRef.current, auto)
       clearToken(sessionCode)
       setResult({ ...res, auto })
@@ -94,11 +123,17 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
           clearInterval(tick); clearInterval(beat)
           return
         }
+        if (h.submission) {
+          submittedRef.current = true
+          clearToken(sessionCode)
+          setResult(h.submission)
+          return
+        }
         if (h.expired) doSubmit(true)
       } catch { /* a dropped beat is not fatal, the next one will catch up */ }
     }, HEARTBEAT_MS)
     return () => { clearInterval(tick); clearInterval(beat) }
-  }, [paper, result, token, doSubmit, paused])
+  }, [paper, result, token, doSubmit, paused, sessionCode])
 
   // Local clock reaching zero submits without waiting for the next heartbeat,
   // unless the sitting is paused, where zero is not a real expiry.
@@ -109,13 +144,9 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
   // ── Autosave ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!paper || result || paused) return
-    const t = setInterval(async () => {
-      setSaving(true)
-      try { await examSaveProgress(token, answersRef.current) } catch { /* retried next cycle */ }
-      finally { setSaving(false) }
-    }, AUTOSAVE_MS)
+    const t = setInterval(persistAnswers, AUTOSAVE_MS)
     return () => clearInterval(t)
-  }, [paper, result, token, paused])
+  }, [paper, result, token, paused, persistAnswers])
 
   // ── Invigilation ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -127,7 +158,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
       // against the candidate.
       if (paused) return
       // Save first: if they do not come back, their work is still banked
-      examSaveProgress(token, answersRef.current).catch(() => {})
+      persistAnswers()
       const res = await examLogEvent(token, "tab_blur", { at: new Date().toISOString() })
       if (res?.disqualified) {
         setFatal("Your attempt was stopped after too many tab switches. Speak to your invigilator.")
@@ -154,7 +185,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
     document.addEventListener("cut", onCopyPaste)
 
     const onBeforeUnload = (e) => {
-      examSaveProgress(token, answersRef.current).catch(() => {})
+      persistAnswers()
       e.preventDefault()
       e.returnValue = ""
     }
@@ -168,7 +199,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
       document.removeEventListener("cut", onCopyPaste)
       window.removeEventListener("beforeunload", onBeforeUnload)
     }
-  }, [paper, result, token, paused])
+  }, [paper, result, token, paused, persistAnswers])
 
   useEffect(() => {
     if (!warning) return
@@ -184,7 +215,13 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
   )
   const q = questions[current]
 
-  const pick = (idx, option) => setAnswers((prev) => ({ ...prev, [idx]: option }))
+  const pick = (idx, option) => {
+    if (submittedRef.current || paused || remaining === 0) return
+    const next = { ...answersRef.current, [idx]: option }
+    answersRef.current = next
+    setAnswers(next)
+    persistAnswers()
+  }
   const toggleFlag = (idx) => setFlagged((prev) => {
     const next = new Set(prev)
     next.has(idx) ? next.delete(idx) : next.add(idx)
@@ -212,12 +249,12 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
     return <Centered>
       <CheckCircle2 size={44} className="text-emerald-500 mb-4" />
       <h2 className="text-2xl font-bold mb-2" style={{ color: NAVY }}>
-        {result.alreadySubmitted ? "Already submitted" : "Your exam is submitted"}
+        {result.timedOut ? "Time elapsed. Your saved answers were scored." : result.alreadySubmitted ? "Already submitted" : "Your exam is submitted"}
       </h2>
-      {result.auto && (
-        <p className="text-sm mb-2" style={{ color: MID }}>Your time ran out, so we submitted your work for you.</p>
+      {result.timedOut && (
+        <p className="text-sm mb-2" style={{ color: MID }}>Unanswered questions receive zero marks. Your administrator can decide whether this attempt is included in the results.</p>
       )}
-      {result.showResults ? (
+      {result.resultIncluded === false ? <p className="text-sm text-amber-800 mb-3">Your administrator has excluded this attempt from published results.</p> : result.showResults ? (
         <p className="text-lg font-semibold mb-3" style={{ color: NAVY }}>
           You scored {result.score} out of {result.total}
         </p>

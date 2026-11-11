@@ -129,7 +129,8 @@ function AccountExams({ user, initialCode }) {
             <div>
               <h3 className="font-semibold text-[#103254]">{exam.examTitle}</h3>
               <p className="text-sm text-gray-600">{exam.candidateName} · {exam.entrySource === 'paper' ? 'Paper-based' : 'Online'}</p>
-              <p className="text-sm mt-2">{exam.status === 'disqualified' ? 'Attempt stopped. Contact your exam administrator.' : exam.status !== 'submitted' ? 'Exam not completed yet.' : exam.resultsOut ? `${exam.score} / ${exam.total} marks` : 'Results not published yet.'}</p>
+              <p className="text-sm mt-2">{exam.status === 'disqualified' ? 'Attempt stopped. Contact your exam administrator.' : exam.status !== 'submitted' ? 'Exam not completed yet.' : exam.resultIncluded === false ? 'Excluded from published results by your administrator.' : exam.resultsOut ? `${exam.score} / ${exam.total} marks` : 'Results not published yet.'}</p>
+              {exam.timedOut && <p className="text-sm text-amber-800">Time elapsed. Saved answers scored.</p>}
               {exam.certificate && <p className="text-sm text-emerald-700">Certificate available{exam.certificate.band ? `: ${exam.certificate.band}` : ''}</p>}
             </div>
             <button onClick={() => open(exam.candidateId)} disabled={opening !== null || exam.status !== 'submitted'}

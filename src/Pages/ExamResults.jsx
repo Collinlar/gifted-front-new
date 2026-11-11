@@ -14,7 +14,7 @@ const ADMIN_API = import.meta.env.VITE_ADMIN_API_URL || "https://gifted-admin.ne
 export default function ExamResults({ results, onClose, sessionCode }) {
   const {
     candidateName, examTitle, score, total, submittedAt,
-    breakdown, showBreakdown, certificate, resultsOut, entrySource,
+    breakdown, showBreakdown, certificate, resultsOut, entrySource, resultIncluded, timedOut,
   } = results
   const pct = total ? Math.round((score / total) * 100) : 0
 
@@ -43,10 +43,11 @@ export default function ExamResults({ results, onClose, sessionCode }) {
             </>
           ) : (
             <p className="text-sm mb-4" style={{ color: MID }}>
-              Your marks have not been released yet.
+              {resultIncluded === false ? "Your administrator has excluded this attempt from published results. Contact them if you need a review." : "Your marks have not been released yet."}
             </p>
           )}
 
+          {timedOut && <p className="text-sm mb-3" style={{ color: MID }}>Time elapsed. Your saved answers were scored; unanswered questions received zero marks.</p>}
           {entrySource === "paper" && <p className="text-sm mb-3" style={{ color: MID }}>
             Paper-based exam. Your manually marked result is included in this sitting.
           </p>}
