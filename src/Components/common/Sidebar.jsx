@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Activity, BookOpen, ChevronRight, HelpCircle, Home, Menu, Calendar, Compass, Clock, ClipboardList, ShoppingBag, Library, Receipt, Trophy } from "lucide-react"
+import { Activity, BookOpen, ChevronRight, HelpCircle, Home, Menu, Calendar, Compass, Clock, ClipboardList, ShoppingBag, Library, Receipt, Trophy, Route } from "lucide-react"
 import { useCart } from "../../store/CartContext"
 import GiftedLogo from "./GiftedLogo"
 
@@ -30,6 +30,7 @@ const SIDEBAR_GROUPS = [
     items: [
       { name: "Dashboard", icon: Home, href: "/overview" },
       { name: "My Tracks", icon: Compass, href: "/tracks" },
+      { name: "Gifted Experience", icon: Route, href: "/gifted-experience" },
       { name: "My Registrations", icon: ClipboardList, href: "/my-registrations" },
       { name: "My Exams", icon: ClipboardList, href: "/my-exams" },
       { name: "My History", icon: Clock, href: "/history" },

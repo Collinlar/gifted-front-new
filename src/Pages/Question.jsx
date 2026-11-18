@@ -11,6 +11,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import QuestionImage from "../Components/common/QuestionImage";
+import { normalizeQuestion, plainAssessmentText, shuffleQuestionAnswers } from "../lib/assessmentMedia";
 
 const shuffleArray = (array) => {
   const newArray = [...array];
@@ -74,9 +76,10 @@ const QuizPage = () => {
         localStorage.removeItem("saved-answers")
         localStorage.removeItem("saved-time")
         const shouldShuffle = original.shuffleQuestions !== false && original.shuffle_questions !== false
+        const normalizedQuestions = (original.questions || []).map(normalizeQuestion)
         const preparedQuestions = shouldShuffle
-          ? shuffleArray(original.questions.map((q) => ({ ...q, answers: shuffleArray(q.answers) })))
-          : original.questions
+          ? shuffleArray(normalizedQuestions.map(shuffleQuestionAnswers))
+          : normalizedQuestions
         const newQuizData = { ...original, questions: preparedQuestions }
         setShuffledQuizData(newQuizData)
         setSelectedAnswers({})
@@ -205,14 +208,20 @@ const QuizPage = () => {
           completed: true,
           date: formattedDate,
           // store per-question review so any attempt can be replayed later
-          review: shuffledQuizData.questions.map((q, index) => ({
+          review: shuffledQuizData.questions.map((rawQuestion, index) => {
+            const q = normalizeQuestion(rawQuestion)
+            return ({
             question: q.question,
             selectedAnswer: selectedAnswers[index] || null,
             image: q.image || null,
+            imageTitle: q.imageTitle || null,
+            media: q.media,
+            options: q.answers,
+            answerMedia: q.answerMedia,
             correctAnswer: q.correctAnswer,
             isCorrect: selectedAnswers[index] === q.correctAnswer,
             explanation: q.explanation || null,
-          })),
+          })}),
         },
       };
 
@@ -224,14 +233,20 @@ const QuizPage = () => {
         year: new Date().getFullYear().toString(),
         correctAnswers: calculateScore(),
         numberOfQuestions: shuffledQuizData.questions.length,
-        review: shuffledQuizData.questions.map((q, index) => ({
+        review: shuffledQuizData.questions.map((rawQuestion, index) => {
+          const q = normalizeQuestion(rawQuestion)
+          return ({
           question: q.question,
           selectedAnswer: selectedAnswers[index] || null,
           image: q.image,
+          imageTitle: q.imageTitle || null,
+          media: q.media,
+          options: q.answers,
+          answerMedia: q.answerMedia,
           correctAnswer: q.correctAnswer,
           isCorrect: selectedAnswers[index] === q.correctAnswer,
           explanation: q.explanation || null,
-        })),
+        })}),
       };
 
       
@@ -324,20 +339,7 @@ const QuizPage = () => {
             <>
               <div className="flex-1 bg-white rounded-xl shadow-lg border border-blue-100">
                 <div className="p-6 max-h-[75vh] overflow-y-auto">
-                    {shuffledQuizData.questions[currentQuestion]?.image && (
-                      <figure className="mb-4">
-                        <img
-                          src={shuffledQuizData.questions[currentQuestion].image}
-                          alt={shuffledQuizData.questions[currentQuestion].imageTitle || "Question visual"}
-                          className="w-full max-h-64 object-contain mx-auto rounded"
-                        />
-                        {shuffledQuizData.questions[currentQuestion].imageTitle && (
-                          <figcaption className="text-center text-xs text-gray-500 mt-1.5">
-                            {shuffledQuizData.questions[currentQuestion].imageTitle}
-                          </figcaption>
-                        )}
-                      </figure>
-                    )}
+                    <QuestionImage media={normalizeQuestion(shuffledQuizData.questions[currentQuestion]).media} />
                     <h3 className="font-semibold text-blue-900 mb-4">
                       Q{currentQuestion + 1}:
                       <span
@@ -347,7 +349,7 @@ const QuizPage = () => {
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {shuffledQuizData.questions[currentQuestion]?.answers.map((option, index) => (
+                      {normalizeQuestion(shuffledQuizData.questions[currentQuestion]).answers.map((option, index) => (
                         <button
                           key={index}
                           onClick={() => handleOptionSelect(option)}
@@ -357,7 +359,9 @@ const QuizPage = () => {
                               : "bg-blue-50 text-blue-800 hover:bg-blue-100"
                           }`}
                         >
-                          <span dangerouslySetInnerHTML={{ __html: option }} />
+                          <span className="block" dangerouslySetInnerHTML={{ __html: option }} />
+                          <QuestionImage media={normalizeQuestion(shuffledQuizData.questions[currentQuestion]).answerMedia[index]}
+                            maxHeight="12rem" className="mt-2 mb-0" />
                         </button>
                       ))}
 
@@ -682,10 +686,11 @@ const QuizPage = () => {
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <div className="space-y-6">
                     {shuffledQuizData.questions.map((q, i) => {
-                      const cleanQuestion = q.question.replace(/<[^>]*>?/gm, "")
-                      const cleanSelected = (selectedAnswers[i] || "").replace(/<[^>]*>?/gm, "")
-                      const cleanCorrect = q.correctAnswer.replace(/<[^>]*>?/gm, "")
-                      const cleanExplanation = q.explanation ? q.explanation.replace(/<[^>]*>?/gm, "") : ""
+                      const normalized = normalizeQuestion(q)
+                      const cleanQuestion = plainAssessmentText(normalized.question)
+                      const cleanSelected = plainAssessmentText(selectedAnswers[i] || "")
+                      const cleanCorrect = plainAssessmentText(normalized.correctAnswer || "")
+                      const cleanExplanation = plainAssessmentText(normalized.explanation || "")
                       const isCorrect = selectedAnswers[i] === q.correctAnswer
                       const isAnswered = selectedAnswers[i] !== undefined
 
@@ -711,26 +716,24 @@ const QuizPage = () => {
                             </h3>
                           </div>
 
-                          {q.image && (
-                            <img
-                              src={q.image}
-                              alt={`Q${i + 1}`}
-                              className="mb-3 w-full max-h-48 object-contain rounded"
-                            />
-                          )}
+                          <QuestionImage media={normalized.media} maxHeight="12rem" lazy />
 
                           <div className="ml-10 space-y-1 text-sm">
-                            <p>
+                            <div>
                               <span className="font-medium text-gray-700">Your answer: </span>
                               <span className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
                                 {cleanSelected || <em className="text-gray-400">Not answered</em>}
                               </span>
-                            </p>
+                              <QuestionImage media={normalized.answerMedia[normalized.answers.indexOf(selectedAnswers[i])] || []}
+                                maxHeight="10rem" lazy className="mt-2 mb-1" />
+                            </div>
                             {!isCorrect && (
-                              <p>
+                              <div>
                                 <span className="font-medium text-gray-700">Correct answer: </span>
                                 <span className="text-green-700 font-medium">{cleanCorrect}</span>
-                              </p>
+                                <QuestionImage media={normalized.answerMedia[normalized.answers.indexOf(normalized.correctAnswer)] || []}
+                                  maxHeight="10rem" lazy className="mt-2 mb-1" />
+                              </div>
                             )}
                             {cleanExplanation && (
                               <p className="mt-2 text-gray-600 bg-white/70 rounded-lg p-2 border border-gray-200">

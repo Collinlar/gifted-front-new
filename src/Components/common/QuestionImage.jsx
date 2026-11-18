@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ImageOff } from "lucide-react"
 
 // The picture attached to a question.
@@ -14,6 +14,7 @@ import { ImageOff } from "lucide-react"
 
 export default function QuestionImage({
   src,
+  media,
   title,
   alt,
   className = "",
@@ -23,36 +24,34 @@ export default function QuestionImage({
   // fold, pass lazy.
   lazy = false,
 }) {
-  const [failed, setFailed] = useState(false)
-  if (!src) return null
+  const items = useMemo(() => Array.isArray(media) && media.length
+    ? media.filter(item => item?.url)
+    : src ? [{ url: src, title, alt }] : [], [media, src, title, alt])
+  const [failed, setFailed] = useState(() => new Set())
+  const signature = items.map(item => item.url).join("\n")
+  useEffect(() => setFailed(new Set()), [signature])
+  if (!items.length) return null
 
   // A dead link on a picture-only question would otherwise leave a blank space
   // with nothing to answer, so it says what happened instead.
-  if (failed) {
-    return (
-      <div className={`mb-4 flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs ${className}`}
-        style={{ borderColor: "#E5E7EB", color: "#6B7280" }}>
-        <ImageOff size={14} />
-        This question has a picture that would not load. Check your connection, or tell us if it keeps happening.
-      </div>
-    )
-  }
-
   return (
-    <figure className={`mb-4 ${className}`}>
-      <img
-        src={src}
-        alt={alt || title || "Picture for this question"}
-        loading={lazy ? "lazy" : "eager"}
-        onError={() => setFailed(true)}
-        className="w-full object-contain mx-auto rounded"
-        style={{ maxHeight }}
-      />
-      {title && (
-        <figcaption className="text-center text-xs mt-1.5" style={{ color: "#6B7280" }}>
-          {title}
-        </figcaption>
-      )}
-    </figure>
+    <div className={`mb-4 grid gap-3 ${items.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'} ${className}`}>
+      {items.map((item, index) => failed.has(index) ? (
+        <div key={`${item.url}-${index}`} className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs"
+          style={{ borderColor: "#E5E7EB", color: "#6B7280" }}>
+          <ImageOff size={14} /> This image would not load. Check your connection, or tell us if it keeps happening.
+        </div>
+      ) : (
+        <figure key={`${item.url}-${index}`}>
+          <img src={item.url} alt={item.alt || item.title || alt || title || `Assessment image ${index + 1}`}
+            loading={lazy ? "lazy" : "eager"}
+            onError={() => setFailed(previous => new Set(previous).add(index))}
+            className="w-full object-contain mx-auto rounded" style={{ maxHeight }} />
+          {(item.title || item.alt) && <figcaption className="text-center text-xs mt-1.5" style={{ color: "#6B7280" }}>
+            {item.title || item.alt}
+          </figcaption>}
+        </figure>
+      ))}
+    </div>
   )
 }

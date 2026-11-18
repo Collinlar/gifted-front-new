@@ -952,7 +952,7 @@ export default function ContestPage() {
                         {/* No contest carries a picture today, but every other
                             paper type does, and this renderer would have
                             dropped it the moment one did. */}
-                        <QuestionImage src={question.image} title={question.imageTitle} />
+                        <QuestionImage media={question.media} src={question.image} title={question.imageTitle} />
 
                         {stripHtmlTags(question.question).trim() && (
                           <h2 className="text-2xl font-bold mb-4" style={{ color: brandColors.primary }}>
@@ -992,9 +992,10 @@ export default function ContestPage() {
                             }`}>
                               {String.fromCharCode(65 + index)}
                             </div>
-                            <span style={{ color: brandColors.text }}>
-                              {stripHtmlTags(option)}
-                            </span>
+                            <div className="flex-1 min-w-0" style={{ color: brandColors.text }}>
+                              <span>{stripHtmlTags(option)}</span>
+                              <QuestionImage media={question.answerMedia?.[index] || []} maxHeight="11rem" className="mt-2 mb-0" />
+                            </div>
                           </div>
                         </motion.button>
                       ))}

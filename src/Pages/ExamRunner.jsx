@@ -1,4 +1,6 @@
 import ExamAccountPrompt from "../Components/ExamAccountPrompt"
+import QuestionImage from "../Components/common/QuestionImage"
+import { normalizeQuestion } from "../lib/assessmentMedia"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Clock, ShieldAlert, CheckCircle2, AlertCircle, Send, Loader2, Flag,
@@ -208,7 +210,7 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
   }, [warning])
 
   // ── Derived ──────────────────────────────────────────────────────────────
-  const questions = paper?.questions || []
+  const questions = useMemo(() => (paper?.questions || []).map(normalizeQuestion), [paper])
   const answeredCount = useMemo(
     () => questions.filter((q) => answers[q.idx] != null).length,
     [questions, answers]
@@ -335,26 +337,19 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
             </button>
           </div>
 
-          {q.image && (
-            <figure className="mb-4">
-              <img src={q.image} alt={q.imageTitle || ""}
-                className="w-full max-h-72 object-contain rounded-lg border border-gray-100" />
-              {q.imageTitle && (
-                <figcaption className="text-center text-xs text-gray-500 mt-1.5">{q.imageTitle}</figcaption>
-              )}
-            </figure>
-          )}
+          <QuestionImage media={q.media} src={q.image} title={q.imageTitle} maxHeight="18rem" />
 
           <div className="text-[15px] leading-relaxed mb-5" style={{ color: "#1F2937" }}
             dangerouslySetInnerHTML={{ __html: q.question }} />
 
           <div className="space-y-2.5">
             {q.answers.map((option, i) => {
-              const chosen = answers[q.idx] === option
+              const answerValue = q.answerValues?.[i] ?? option
+              const chosen = answers[q.idx] === answerValue
               return (
                 <button
                   key={i}
-                  onClick={() => pick(q.idx, option)}
+                  onClick={() => pick(q.idx, answerValue)}
                   className="w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-start gap-3"
                   style={{
                     borderColor: chosen ? NAVY : "#E5E7EB",
@@ -371,8 +366,10 @@ export default function ExamRunner({ token, onFinished, sessionCode }) {
                   >
                     {String.fromCharCode(65 + i)}
                   </span>
-                  <span className="flex-1 text-[15px]" style={{ color: "#1F2937" }}
-                    dangerouslySetInnerHTML={{ __html: option }} />
+                  <div className="flex-1 min-w-0 text-[15px]" style={{ color: "#1F2937" }}>
+                    <span dangerouslySetInnerHTML={{ __html: option }} />
+                    <QuestionImage media={q.answerMedia?.[i] || []} maxHeight="12rem" className="mt-2 mb-0" />
+                  </div>
                 </button>
               )
             })}

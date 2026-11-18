@@ -19,7 +19,8 @@ import LearningManagement from "./Pages/LearningManagement";
 import AssessmentManagement from "./Pages/AssessmentManagement";
 import FeaturedQuizzes from "./Pages/FeaturedQuizzes";
 import AIAgent from "./Pages/AIAgent";
-import Diagnostics from "./Pages/Diagnostics";
+import Diagnostics from "./Pages/LearnerDiagnostics";
+import GiftedExperience from "./Pages/GiftedExperience";
 import { useContext,useEffect, useState } from "react";
 
 import { storeContext } from './Context'
@@ -84,7 +85,7 @@ const SIDEBAR_ROUTES = [
   "/overview", "/tracks", "/my-exams", "/history", "/profile", "/my-registrations",
   "/programs", "/learning-management", "/assessment-management",
   "/marketplace", "/checkout", "/my-library", "/payments", "/invoice-page",
-  "/calendar-page", "/community", "/ai-agent", "/diagnostics", "/invoice",
+  "/calendar-page", "/community", "/ai-agent", "/diagnostics", "/gifted-experience", "/invoice",
   "/contest-overview", "/contest-page", "/leaderboard",
   "/practice-overview", "/practice",
 ]
@@ -174,6 +175,7 @@ function App() {
 				    any money, so it is gone rather than left reachable. */}
 				<Route path='/invoice' element={<Payments />} />
 				<Route path='/diagnostics' element={<Diagnostics />} />
+				<Route path='/gifted-experience' element={<GiftedExperience />} />
 				<Route element={<Auth/>} path="/sign-up"/>
 				<Route element={<Auth/>} path="/login"/>
 				<Route element={<Login/>} path="/login-legacy"/>

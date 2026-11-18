@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { supabaseAdmin } from './supabaseAdmin'
 import { shrinkImage } from './imageResize'
 import { parseGrade, matchesGrade } from './grades'
+import { normalizeQuestions } from './assessmentMedia'
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -435,6 +436,7 @@ export function normalizeExam(e) {
       : e.instructions
         ? [String(e.instructions)]
         : [],
+    questions: normalizeQuestions(e.questions),
   }
 }
 
@@ -926,7 +928,7 @@ export async function getPracticeQueue(userId, examId, sessionSize = 12) {
     }
   }
 
-  const allQuestions = (exam.questions || []).map(normalizeQ)
+  const allQuestions = normalizeQuestions(exam.questions).map(normalizeQ)
 
   // Fetch existing mastery rows for this user + exam
   const { data: masteryRows, error: mErr } = await supabaseAdmin

@@ -2,6 +2,8 @@ import { getTokenUserId } from "../lib/auth";
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getExam, fetchQuizReview } from '../lib/api';
+import QuestionImage from '../Components/common/QuestionImage';
+import { normalizeQuestion } from '../lib/assessmentMedia';
 
 const ReviewAssessments = () => {
   const locator = useLocation();
@@ -350,8 +352,14 @@ const ReviewAssessments = () => {
             <p className="text-blue-700 text-lg">Loading review...</p>
           ) : (
             <div className="space-y-6">
-              {quizReview.map((item, index) => {
+              {quizReview.map((rawItem, index) => {
+                const item = normalizeQuestion({
+                  ...rawItem,
+                  answers: rawItem.options || [rawItem.selectedAnswer, rawItem.correctAnswer],
+                });
                 const isCorrect = item.isCorrect;
+                const selectedIndex = item.answerValues?.findIndex((answer) => answer === rawItem.selectedAnswer) ?? -1;
+                const correctIndex = item.answerValues?.findIndex((answer) => answer === rawItem.correctAnswer) ?? -1;
                 return (
                   <div
                     key={index}
@@ -366,15 +374,7 @@ const ReviewAssessments = () => {
                       <EnhancedTextViewer content={item.question} inline />
                     </div>
 
-                    {item.image && (
-                      <div className="mb-4">
-                        <img
-                          src={item.image}
-                          alt={`Question ${index + 1}`}
-                          className="w-full max-w-md rounded-lg border border-gray-200 shadow-sm"
-                        />
-                      </div>
-                    )}
+                    <QuestionImage media={item.media} src={item.image} title={item.imageTitle} maxHeight="18rem" lazy />
 
                     {Array.isArray(item.options) && item.options.length > 0 && (
                       <div className="mb-3">
@@ -383,6 +383,7 @@ const ReviewAssessments = () => {
                           {item.options.map((opt, optIdx) => (
                             <li key={optIdx} className="text-blue-900">
                               <EnhancedTextViewer content={opt} inline />
+                              <QuestionImage media={item.answerMedia?.[optIdx] || []} maxHeight="9rem" className="ml-5 mt-2 mb-1" lazy />
                             </li>
                           ))}
                         </ul>
@@ -391,21 +392,23 @@ const ReviewAssessments = () => {
 
                     <div className="mb-1">
                       <strong>Your Answer:</strong>{' '}
-                      <span
+                      <div
                         className={
                           isCorrect
                             ? 'text-green-700 font-semibold'
                             : 'text-red-700 font-semibold'
                         }
                       >
-                        <EnhancedTextViewer content={item.selectedAnswer || 'No answer'} inline />
-                      </span>
+                        <EnhancedTextViewer content={item.answers[selectedIndex] || item.selectedAnswer || 'No answer'} inline />
+                        <QuestionImage media={item.answerMedia?.[selectedIndex] || []} maxHeight="9rem" className="mt-2 mb-1" lazy />
+                      </div>
                     </div>
                     <div className="mb-1">
                       <strong>Correct Answer:</strong>{' '}
-                      <span className="text-green-700 font-semibold">
-                        <EnhancedTextViewer content={item.correctAnswer} inline />
-                      </span>
+                      <div className="text-green-700 font-semibold">
+                        <EnhancedTextViewer content={item.answers[correctIndex] || item.correctAnswer} inline />
+                        <QuestionImage media={item.answerMedia?.[correctIndex] || []} maxHeight="9rem" className="mt-2 mb-1" lazy />
+                      </div>
                     </div>
                     {item.explanation && (
                       <div>

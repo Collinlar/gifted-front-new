@@ -1,6 +1,7 @@
 import ExamAccountPrompt from "../Components/ExamAccountPrompt"
 import { CheckCircle2, XCircle, MinusCircle, Award, Download, BadgeCheck } from "lucide-react"
 import QuestionImage from "../Components/common/QuestionImage"
+import { normalizeQuestion } from "../lib/assessmentMedia"
 
 const NAVY = "#103254"
 const MID  = "#2666A6"
@@ -89,7 +90,14 @@ export default function ExamResults({ results, onClose, sessionCode }) {
           <div className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-semibold mb-3" style={{ color: NAVY }}>Question by question</h2>
             <div className="divide-y divide-gray-100">
-              {breakdown.map((q, i) => (
+              {breakdown.map((rawQuestion, i) => {
+                const q = normalizeQuestion({
+                  ...rawQuestion,
+                  answers: rawQuestion.answers || [rawQuestion.yourAnswer, rawQuestion.correctAnswer],
+                })
+                const selectedIndex = q.answerValues?.findIndex((answer) => answer === rawQuestion.yourAnswer) ?? -1
+                const correctIndex = q.answerValues?.findIndex((answer) => answer === rawQuestion.correctAnswer) ?? -1
+                return (
                 <div key={i} className="py-3 flex items-start gap-3">
                   <span className="shrink-0 mt-0.5">
                     {q.yourAnswer == null
@@ -101,23 +109,25 @@ export default function ExamResults({ results, onClose, sessionCode }) {
                   <div className="flex-1 min-w-0">
                     {/* 44 exam questions are a diagram with no text at all, so
                         without this the row reads "Q12." and nothing else. */}
-                    <QuestionImage src={q.image} title={q.imageTitle} maxHeight="12rem" lazy />
+                    <QuestionImage media={q.media} src={q.image} title={q.imageTitle} maxHeight="12rem" lazy />
                     <p className="text-sm mb-1" style={{ color: "#1F2937" }}>
                       <span className="font-semibold" style={{ color: MID }}>Q{i + 1}.</span>{" "}
                       <span dangerouslySetInnerHTML={{ __html: q.question }} />
                     </p>
-                    <p className="text-xs mb-0.5">
+                    <div className="text-xs mb-0.5">
                       <span className="text-gray-500">You chose: </span>
                       {q.yourAnswer
                         ? <span className={q.correct ? "text-emerald-700" : "text-red-600"}
-                            dangerouslySetInnerHTML={{ __html: q.yourAnswer }} />
+                            dangerouslySetInnerHTML={{ __html: q.answers[selectedIndex] ?? q.yourAnswer }} />
                         : <span className="text-gray-400">left blank</span>}
-                    </p>
+                      <QuestionImage media={q.answerMedia?.[selectedIndex] || []} maxHeight="9rem" className="mt-2 mb-0" lazy />
+                    </div>
                     {!q.correct && (
-                      <p className="text-xs">
+                      <div className="text-xs">
                         <span className="text-gray-500">Correct answer: </span>
-                        <span className="text-emerald-700" dangerouslySetInnerHTML={{ __html: q.correctAnswer || "" }} />
-                      </p>
+                        <span className="text-emerald-700" dangerouslySetInnerHTML={{ __html: (q.answers[correctIndex] ?? q.correctAnswer) || "" }} />
+                        <QuestionImage media={q.answerMedia?.[correctIndex] || []} maxHeight="9rem" className="mt-2 mb-0" lazy />
+                      </div>
                     )}
                     {!q.correct && q.explanation && (
                       <p className="text-xs text-gray-500 mt-1 pl-2 border-l-2 border-gray-200"
@@ -125,7 +135,8 @@ export default function ExamResults({ results, onClose, sessionCode }) {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

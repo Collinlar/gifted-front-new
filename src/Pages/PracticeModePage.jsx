@@ -359,7 +359,7 @@ export default function PracticeModePage() {
               {/* Half of all practice questions carry one of these and none of
                   them were being drawn, so students were answering questions
                   about diagrams they could not see. */}
-              <QuestionImage src={current.image} title={current.imageTitle} />
+              <QuestionImage media={current.media} src={current.image} title={current.imageTitle} />
 
               {/* Some questions are the picture, with no text at all. An empty
                   heading under the diagram just adds a gap. */}
@@ -431,7 +431,7 @@ export default function PracticeModePage() {
                     disabled={answered}
                     className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center justify-between gap-4 ${bg} ${!answered ? 'cursor-pointer' : 'cursor-default'}`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
                       <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                         answered && isCorrect ? 'border-green-400 bg-green-100 text-green-700' :
                         answered && isSelected ? 'border-red-400 bg-red-100 text-red-700' :
@@ -439,7 +439,10 @@ export default function PracticeModePage() {
                       }`}>
                         {String.fromCharCode(65 + idx)}
                       </span>
-                      <span className={`text-sm font-medium ${textCol}`}>{stripHtml(String(option))}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-medium ${textCol}`}>{stripHtml(String(option))}</span>
+                        <QuestionImage media={current.answerMedia?.[idx] || []} maxHeight="11rem" className="mt-2 mb-0" />
+                      </div>
                     </div>
                     {answered && isCorrect && <CheckCircle size={18} className="text-green-500 flex-shrink-0" />}
                     {answered && isSelected && !isCorrect && <XCircle size={18} className="text-red-500 flex-shrink-0" />}
